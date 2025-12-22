@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  /* Light Mode (Default) */
+  --font-body: 'Inter', 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  --color-zg-bg: #ffffff;
+  --color-zg-surface: #f4f4f5;
+  --color-zg-primary: #18181b;
+  --color-zg-secondary: #71717a;
+  --color-zg-accent: #d4af37;
+  --color-zg-accent-hover: #b5952f;
+
+  --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.15);
+}
+
+:root[data-theme="dark"] {
+  /* Dark Mode */
+  --color-zg-bg: #0a0a0a;
+  --color-zg-surface: #121212;
+  --color-zg-primary: #ffffff;
+  --color-zg-secondary: #a1a1aa;
+}
+
+@theme {
+  --font-body: var(--font-body);
+  --font-heading: var(--font-heading);
+
+  --color-zg-bg: var(--color-zg-bg);
+  --color-zg-surface: var(--color-zg-surface);
+  --color-zg-primary: var(--color-zg-primary);
+  --color-zg-secondary: var(--color-zg-secondary);
+  --color-zg-accent: var(--color-zg-accent);
+  --color-zg-accent-hover: var(--color-zg-accent-hover);
+
+  --shadow-glow: var(--shadow-glow);
+}
+
+@layer base {
+  body {
+    @apply bg-zg-bg text-zg-primary font-body antialiased selection:bg-zg-accent selection:text-black;
+    /* background-image: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #0a0a0a 100%); Remove hardcoded dark gradient */
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold tracking-tight;
+  }
+}
+
+
+
+@layer components {
+
+  /* Custom Container */
+
+
+  /* Components */
+  .btn {
+    @apply inline-flex items-center justify-center px-8 py-3.5 rounded-lg font-heading font-semibold uppercase tracking-wider text-sm transition-all duration-300 cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply bg-zg-accent text-black hover:bg-zg-accent-hover shadow-glow hover:-translate-y-0.5;
+  }
+
+  .input-group {
+    @apply mb-6;
+  }
+
+  .input-group label {
+    @apply block mb-2 text-zg-secondary text-xs font-bold uppercase tracking-widest;
+  }
+
+  .input-group input {
+    @apply w-full px-5 py-4 bg-zg-surface border border-white/10 rounded-lg text-zg-primary focus:outline-none focus:border-zg-accent/50 focus:ring-1 focus:ring-zg-accent/50 transition-all placeholder-zg-secondary/50;
+  }
+
+  .card {
+    @apply bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 shadow-2xl rounded-2xl p-8 md:p-12;
+  }
+
+  .nav-link {
+    @apply relative text-sm font-heading font-medium tracking-widest text-zg-secondary hover:text-zg-primary transition-colors uppercase py-2;
+  }
+
+  .nav-link::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-0 h-px bg-zg-accent transition-all duration-300;
+  }
+
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+}

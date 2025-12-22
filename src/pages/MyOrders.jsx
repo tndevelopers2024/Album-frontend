@@ -16,7 +16,7 @@ const MyOrders = () => {
                     return;
                 }
 
-                const response = await fetch(`http://album-backend-eta.vercel.app/api/orders/my-orders/${user.id}`);
+                const response = await fetch(`https://album-backend-eta.vercel.app/api/orders/my-orders/${user.id}`);
                 const data = await response.json();
                 setOrders(data);
             } catch (error) {

@@ -71,7 +71,7 @@ const Admin = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://album-backend-eta.vercel.app/api/users');
+            const response = await fetch('https://album-backend-eta.vercel.app/api/users');
             const data = await response.json();
             setUsers(data);
         } catch (error) {
@@ -102,7 +102,7 @@ const Admin = () => {
 
     const handleVerify = async (userId, action) => {
         try {
-            const response = await fetch('http://album-backend-eta.vercel.app/api/verify', {
+            const response = await fetch('https://album-backend-eta.vercel.app/api/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, action })

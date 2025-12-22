@@ -16,7 +16,7 @@ const ProductDetails = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(`http://album-backend-eta.vercel.app/api/products/${productId}`);
+            const response = await fetch(`https://album-backend-eta.vercel.app/api/products/${productId}`);
             const data = await response.json();
             setProduct(data);
             setMainImage(data.image);

@@ -29,7 +29,7 @@ const ProductForm = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(`https://zerogravity-backend.vercel.app/api/products/${id}`);
+            const response = await fetch(`http://album-backend-eta.vercel.app/api/products/${id}`);
             const data = await response.json();
             setFormData({
                 name: data.name || '',
@@ -59,7 +59,7 @@ const ProductForm = () => {
 
         setUploading(true);
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/upload', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/upload', {
                 method: 'POST',
                 body: uploadData
             });
@@ -88,7 +88,7 @@ const ProductForm = () => {
                 const uploadData = new FormData();
                 uploadData.append('image', file);
 
-                const response = await fetch('https://zerogravity-backend.vercel.app/api/upload', {
+                const response = await fetch('http://album-backend-eta.vercel.app/api/upload', {
                     method: 'POST',
                     body: uploadData
                 });
@@ -136,8 +136,8 @@ const ProductForm = () => {
         setLoading(true);
 
         const url = isEditMode
-            ? `https://zerogravity-backend.vercel.app/api/products/${id}`
-            : 'https://zerogravity-backend.vercel.app/api/products';
+            ? `http://album-backend-eta.vercel.app/api/products/${id}`
+            : 'http://album-backend-eta.vercel.app/api/products';
 
         const method = isEditMode ? 'PUT' : 'POST';
 

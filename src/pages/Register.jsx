@@ -30,7 +30,7 @@ const Register = () => {
 
         setUploading(true);
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/upload', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/upload', {
                 method: 'POST',
                 body: uploadData
             });
@@ -56,7 +56,7 @@ const Register = () => {
         }
 
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/register', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData),

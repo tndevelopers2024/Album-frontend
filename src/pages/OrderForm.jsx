@@ -43,7 +43,7 @@ const OrderForm = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(`https://zerogravity-backend.vercel.app/api/products/${productId}`);
+            const response = await fetch(`http://album-backend-eta.vercel.app/api/products/${productId}`);
             const data = await response.json();
             setProduct(data);
         } catch (error) {
@@ -88,7 +88,7 @@ const OrderForm = () => {
 
         setUploading(true);
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/upload', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/upload', {
                 method: 'POST',
                 body: uploadData
             });
@@ -124,7 +124,7 @@ const OrderForm = () => {
                 productId
             };
 
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/orders', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(orderData)

@@ -22,7 +22,7 @@ const Login = () => {
         setError('');
 
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/login', {
+            const response = await fetch('http://album-backend-eta.vercel.app/api/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

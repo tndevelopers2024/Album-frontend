@@ -14,7 +14,7 @@ const AdminOrders = () => {
 
     const fetchOrders = async () => {
         try {
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/orders');
+            const response = await fetch('http://album-backend-eta.vercel.app/api/orders');
             const data = await response.json();
             setOrders(data);
         } catch (error) {

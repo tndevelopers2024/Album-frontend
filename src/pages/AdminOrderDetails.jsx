@@ -28,7 +28,7 @@ const AdminOrderDetails = () => {
             // Actually, I can check if I can just use the existing GET /api/orders and filter client side?
             // Yes, let's do that for simplicity unless performance is an issue (it's not for this demo).
 
-            const response = await fetch('https://zerogravity-backend.vercel.app/api/orders');
+            const response = await fetch('http://album-backend-eta.vercel.app/api/orders');
             const data = await response.json();
             const foundOrder = data.find(o => o._id === orderId);
             setOrder(foundOrder);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { Users, CheckCircle, XCircle, Clock, MoreVertical, Search, Filter, ChevronDown, SortAsc, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import API_ENDPOINTS from '../api';
 
 const StatCard = ({ title, value, icon: Icon, color }) => {
     const colorStyles = {
@@ -71,7 +72,7 @@ const Admin = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/users');
+            const response = await fetch(API_ENDPOINTS.USERS);
             const data = await response.json();
             setUsers(data);
         } catch (error) {
@@ -102,7 +103,7 @@ const Admin = () => {
 
     const handleVerify = async (userId, action) => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/verify', {
+            const response = await fetch(API_ENDPOINTS.VERIFY, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, action })

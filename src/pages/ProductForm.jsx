@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { ArrowLeft, Save, Upload, X, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
+import API_ENDPOINTS from '../api';
+import getImageUrl from '../utils/imageUtils';
 
 const ProductForm = () => {
     const { id } = useParams();
@@ -15,11 +17,21 @@ const ProductForm = () => {
         gallery: [],
         features: [],
         benefits: [],
-        price: ''
+        price: '',
+        boxPrice: '',
+        frontPageOptions: {
+            showFullNames: false,
+            showInitials: false,
+            showImage: false,
+            showDate: false,
+            showCustomText: false
+        }
     });
     const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [galleryUploading, setGalleryUploading] = useState(false);
+
+    // Store file objects for deferred upload
+    const [imageFile, setImageFile] = useState(null);
+    const [galleryFiles, setGalleryFiles] = useState([]);
 
     useEffect(() => {
         if (isEditMode) {
@@ -29,7 +41,7 @@ const ProductForm = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(`https://album-backend-eta.vercel.app/api/products/${id}`);
+            const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(id));
             const data = await response.json();
             setFormData({
                 name: data.name || '',
@@ -38,7 +50,15 @@ const ProductForm = () => {
                 gallery: data.gallery || [],
                 features: data.features || [],
                 benefits: data.benefits || [],
-                price: data.price || ''
+                price: data.price || '',
+                boxPrice: data.boxPrice || '',
+                frontPageOptions: data.frontPageOptions || {
+                    showFullNames: false,
+                    showInitials: false,
+                    showImage: false,
+                    showDate: false,
+                    showCustomText: false
+                }
             });
         } catch (error) {
             console.error('Error fetching product:', error);
@@ -50,60 +70,30 @@ const ProductForm = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleImageUpload = async (e) => {
+    // Handle image file selection (no upload yet)
+    const handleImageSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const uploadData = new FormData();
-        uploadData.append('image', file);
-
-        setUploading(true);
-        try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/upload', {
-                method: 'POST',
-                body: uploadData
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setFormData(prev => ({ ...prev, image: data.imageUrl }));
-            } else {
-                alert('Image upload failed');
-            }
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            alert('Error uploading image');
-        } finally {
-            setUploading(false);
-        }
+        setImageFile(file);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file);
+        setFormData(prev => ({ ...prev, image: previewUrl }));
     };
 
-    const handleGalleryUpload = async (e) => {
+    // Handle gallery files selection (no upload yet)
+    const handleGallerySelect = (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        setGalleryUploading(true);
-        try {
-            const newImages = [];
-            for (const file of files) {
-                const uploadData = new FormData();
-                uploadData.append('image', file);
+        setGalleryFiles(prev => [...prev, ...files]);
 
-                const response = await fetch('https://album-backend-eta.vercel.app/api/upload', {
-                    method: 'POST',
-                    body: uploadData
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    newImages.push(data.imageUrl);
-                }
-            }
-            setFormData(prev => ({ ...prev, gallery: [...prev.gallery, ...newImages] }));
-        } catch (error) {
-            console.error('Error uploading gallery images:', error);
-            alert('Error uploading gallery images');
-        } finally {
-            setGalleryUploading(false);
-        }
+        // Create preview URLs
+        const previewUrls = files.map(file => URL.createObjectURL(file));
+        setFormData(prev => ({
+            ...prev,
+            gallery: [...prev.gallery, ...previewUrls]
+        }));
     };
 
     const removeGalleryImage = (index) => {
@@ -131,24 +121,80 @@ const ProductForm = () => {
         }));
     };
 
+    const handleFrontPageOptionChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            frontPageOptions: {
+                ...prev.frontPageOptions,
+                [field]: value
+            }
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         const url = isEditMode
-            ? `https://album-backend-eta.vercel.app/api/products/${id}`
-            : 'https://album-backend-eta.vercel.app/api/products';
+            ? API_ENDPOINTS.PRODUCT_BY_ID(id)
+            : API_ENDPOINTS.PRODUCTS;
 
         const method = isEditMode ? 'PUT' : 'POST';
 
-        // Filter out empty strings from lists
-        const cleanData = {
-            ...formData,
-            features: formData.features.filter(item => item.trim() !== ''),
-            benefits: formData.benefits.filter(item => item.trim() !== '')
-        };
-
         try {
+            let uploadedImagePath = formData.image;
+            let uploadedGalleryPaths = formData.gallery;
+
+            // Upload main image if new file selected
+            if (imageFile) {
+                const imageFormData = new FormData();
+                imageFormData.append('image', imageFile);
+
+                const uploadRes = await fetch(API_ENDPOINTS.UPLOAD, {
+                    method: 'POST',
+                    body: imageFormData
+                });
+                const uploadData = await uploadRes.json();
+                if (uploadRes.ok) {
+                    uploadedImagePath = uploadData.imageUrl;
+                } else {
+                    alert('Failed to upload main image');
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // Upload gallery images if new files selected
+            if (galleryFiles.length > 0) {
+                const uploadedPaths = [];
+                for (const file of galleryFiles) {
+                    const galleryFormData = new FormData();
+                    galleryFormData.append('image', file);
+
+                    const uploadRes = await fetch(API_ENDPOINTS.UPLOAD, {
+                        method: 'POST',
+                        body: galleryFormData
+                    });
+                    const uploadData = await uploadRes.json();
+                    if (uploadRes.ok) {
+                        uploadedPaths.push(uploadData.imageUrl);
+                    }
+                }
+
+                // Merge with existing gallery images (filter out blob URLs)
+                const existingImages = formData.gallery.filter(img => !img.startsWith('blob:'));
+                uploadedGalleryPaths = [...existingImages, ...uploadedPaths];
+            }
+
+            // Filter out empty strings from lists
+            const cleanData = {
+                ...formData,
+                image: uploadedImagePath,
+                gallery: uploadedGalleryPaths,
+                features: formData.features.filter(item => item.trim() !== ''),
+                benefits: formData.benefits.filter(item => item.trim() !== '')
+            };
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -209,17 +255,30 @@ const ProductForm = () => {
                             </div>
 
                             {/* Price */}
-                            <div className="md:col-span-2">
-                                <label className="text-zg-secondary text-sm mb-2 block">Price (₹)</label>
+                            <div>
+                                <label className="text-zg-secondary text-sm mb-2 block">Price *</label>
                                 <input
                                     type="number"
                                     name="price"
-                                    min="0"
-                                    step="0.01"
+                                    required
                                     value={formData.price}
                                     onChange={handleChange}
-                                    placeholder="Enter product price"
-                                    className="w-full px-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition"
+                                    placeholder="Enter price"
+                                    className="w-full px-4 py-3 rounded-xl bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-2 focus:ring-zg-accent/20 transition-all placeholder:text-zg-secondary/30"
+                                />
+                            </div>
+
+                            {/* Box/PAD Price */}
+                            <div>
+                                <label className="text-zg-secondary text-sm mb-2 block">Box/PAD Price *</label>
+                                <input
+                                    type="number"
+                                    name="boxPrice"
+                                    required
+                                    value={formData.boxPrice}
+                                    onChange={handleChange}
+                                    placeholder="Enter box price"
+                                    className="w-full px-4 py-3 rounded-xl bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-2 focus:ring-zg-accent/20 transition-all placeholder:text-zg-secondary/30"
                                 />
                             </div>
 
@@ -300,19 +359,18 @@ const ProductForm = () => {
                                                 <input
                                                     type="file"
                                                     accept="image/*"
-                                                    onChange={handleImageUpload}
+                                                    onChange={handleImageSelect}
                                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                                    disabled={uploading}
                                                 />
                                                 <div className="w-full px-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-secondary flex items-center gap-2 hover:border-zg-accent transition-colors">
                                                     <Upload className="w-4 h-4" />
-                                                    <span>{uploading ? 'Uploading...' : formData.image ? 'Change Image' : 'Upload Main Image'}</span>
+                                                    <span>{formData.image ? 'Change Image' : 'Upload Main Image'}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         {formData.image && (
                                             <div className="w-24 h-24 rounded-lg bg-zg-surface border border-zg-secondary/10 overflow-hidden flex-shrink-0 relative group">
-                                                <img src={formData.image} alt="Main Preview" className="w-full h-full object-cover" />
+                                                <img src={getImageUrl(formData.image)} alt="Main Preview" className="w-full h-full object-cover" />
                                             </div>
                                         )}
                                     </div>
@@ -342,13 +400,12 @@ const ProductForm = () => {
                                             type="file"
                                             accept="image/*"
                                             multiple
-                                            onChange={handleGalleryUpload}
+                                            onChange={handleGallerySelect}
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                            disabled={galleryUploading}
                                         />
                                         <div className="w-full px-4 py-8 rounded-lg bg-zg-surface border-2 border-dashed border-zg-secondary/20 text-zg-secondary flex flex-col items-center justify-center gap-2 hover:border-zg-accent hover:text-zg-primary transition-colors">
                                             <ImageIcon className="w-8 h-8 opacity-50" />
-                                            <span className="font-medium">{galleryUploading ? 'Uploading...' : 'Click to upload gallery images'}</span>
+                                            <span className="font-medium">Click to upload gallery images</span>
                                             <span className="text-xs opacity-50">Supports multiple files</span>
                                         </div>
                                     </div>
@@ -385,7 +442,7 @@ const ProductForm = () => {
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                             {formData.gallery.map((img, index) => (
                                                 <div key={index} className="relative aspect-square rounded-lg bg-zg-surface border border-zg-secondary/10 overflow-hidden group">
-                                                    <img src={img} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                                                    <img src={getImageUrl(img)} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
                                                     <button
                                                         type="button"
                                                         onClick={() => removeGalleryImage(index)}
@@ -401,6 +458,85 @@ const ProductForm = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Front Page Customization Options */}
+                    <div className="bg-zg-surface border border-zg-secondary/10 rounded-2xl p-8">
+                        <h2 className="text-xl font-heading font-bold mb-6">Front Page Customization Options</h2>
+                        <p className="text-sm text-zg-secondary mb-6">
+                            Select which customization options customers can use for the album cover
+                        </p>
+
+                        <div className="space-y-6">
+                            {/* Customization Checkboxes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.frontPageOptions.showFullNames}
+                                        onChange={(e) => handleFrontPageOptionChange('showFullNames', e.target.checked)}
+                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-zg-primary">Full Names</div>
+                                        <div className="text-xs text-zg-secondary">Allow customers to add full names on cover</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.frontPageOptions.showInitials}
+                                        onChange={(e) => handleFrontPageOptionChange('showInitials', e.target.checked)}
+                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-zg-primary">Initials</div>
+                                        <div className="text-xs text-zg-secondary">Allow customers to add initials on cover</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.frontPageOptions.showImage}
+                                        onChange={(e) => handleFrontPageOptionChange('showImage', e.target.checked)}
+                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-zg-primary">Cover Image</div>
+                                        <div className="text-xs text-zg-secondary">Allow customers to upload cover image</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.frontPageOptions.showDate}
+                                        onChange={(e) => handleFrontPageOptionChange('showDate', e.target.checked)}
+                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-zg-primary">Event Date</div>
+                                        <div className="text-xs text-zg-secondary">Allow customers to add event date</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.frontPageOptions.showCustomText}
+                                        onChange={(e) => handleFrontPageOptionChange('showCustomText', e.target.checked)}
+                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-zg-primary">Custom Text</div>
+                                        <div className="text-xs text-zg-secondary">Allow customers to add custom text</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
 
                     <div className="flex justify-end gap-4">
                         <button

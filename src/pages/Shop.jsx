@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import API_ENDPOINTS from '../api';
+import { getImageUrl } from '../utils/imageUtils';
 
 const Shop = () => {
     const [products, setProducts] = useState([]);
@@ -15,7 +17,7 @@ const Shop = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/products');
+            const response = await fetch(API_ENDPOINTS.PRODUCTS);
             const data = await response.json();
             setProducts(data);
         } catch (error) {
@@ -51,9 +53,9 @@ const Shop = () => {
                         {products.map((product) => (
                             <div key={product._id} className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl overflow-hidden group hover:border-zg-accent/50 transition-all duration-300">
                                 <div className="aspect-[4/3] overflow-hidden bg-zg-secondary/5 relative">
-                                    {product.image ? (
+                                    {product.image || (product.gallery && product.gallery[0]) ? (
                                         <img
-                                            src={product.image}
+                                            src={getImageUrl(product.image || product.gallery[0])}
                                             alt={product.name}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />

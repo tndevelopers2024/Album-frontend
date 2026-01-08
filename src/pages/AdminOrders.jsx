@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { Search, Filter, Eye, MoreVertical, CheckCircle, XCircle, Clock, Package } from 'lucide-react';
+import API_ENDPOINTS from '../api';
+import getImageUrl from '../utils/imageUtils';
 
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -14,7 +16,7 @@ const AdminOrders = () => {
 
     const fetchOrders = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/orders');
+            const response = await fetch(API_ENDPOINTS.ORDERS);
             const data = await response.json();
             setOrders(data);
         } catch (error) {
@@ -25,16 +27,22 @@ const AdminOrders = () => {
     };
 
     const handleStatusUpdate = async (orderId, newStatus) => {
-        // In a real app, you'd have an endpoint to update status.
-        // For now, we'll just simulate it or assume the endpoint exists if we created it (we didn't create a specific status update endpoint yet, but we can add it or use PUT /orders/:id if we make one).
-        // Let's assume we need to add that capability or just mock it for UI now.
-        // Actually, let's add a simple alert since we didn't explicitly plan a status update endpoint in the previous step, 
-        // but it's easy to add. I'll stick to the plan which was "Update Status: Dropdown".
-        // I'll implement the UI logic and a placeholder fetch.
+        try {
+            const response = await fetch(`${API_ENDPOINTS.ORDERS}/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
 
-        console.log(`Updating order ${orderId} to ${newStatus}`);
-        // Ideally: await fetch(`/api/orders/${orderId}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
-        // Refresh orders
+            if (response.ok) {
+                // Refresh orders list
+                fetchOrders();
+            } else {
+                console.error('Failed to update status');
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+        }
     };
 
     const filteredOrders = orders.filter(order => {
@@ -112,7 +120,7 @@ const AdminOrders = () => {
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded bg-zg-secondary/10 overflow-hidden">
                                                 {order.product?.image && (
-                                                    <img src={order.product.image} alt="" className="w-full h-full object-cover" />
+                                                    <img src={getImageUrl(order.product.image)} alt="" className="w-full h-full object-cover" />
                                                 )}
                                             </div>
                                             <div className="flex flex-col">

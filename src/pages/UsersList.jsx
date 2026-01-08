@@ -4,6 +4,7 @@ import DashboardLayout from '../components/layouts/DashboardLayout';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { Users, CheckCircle, XCircle, Clock, Search, Filter, ChevronDown, SortAsc, X, Eye, Mail, Phone, Building2, FileText, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import API_ENDPOINTS from '../api';
 
 
 const UsersList = () => {
@@ -17,7 +18,7 @@ const UsersList = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/users');
+            const response = await fetch(API_ENDPOINTS.USERS);
             const data = await response.json();
             setUsers(data);
         } catch (error) {
@@ -52,7 +53,7 @@ const UsersList = () => {
 
     const handleVerify = async (userId, action) => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/verify', {
+            const response = await fetch(API_ENDPOINTS.VERIFY, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, action })
@@ -67,7 +68,7 @@ const UsersList = () => {
 
     const handleDelete = async (userId) => {
         try {
-            const response = await fetch(`https://album-backend-eta.vercel.app/api/users/${userId}`, {
+            const response = await fetch(API_ENDPOINTS.USER_BY_ID(userId), {
                 method: 'DELETE'
             });
             if (response.ok) {

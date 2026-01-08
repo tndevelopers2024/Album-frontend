@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { Package, Search, Plus, Edit, Trash2, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
+import API_ENDPOINTS from '../api';
+import { getImageUrl } from '../utils/imageUtils';
 
 const ProductsList = () => {
     const [products, setProducts] = useState([]);
@@ -16,7 +18,7 @@ const ProductsList = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/products');
+            const response = await fetch(API_ENDPOINTS.PRODUCTS);
             const data = await response.json();
             setProducts(data);
         } catch (error) {
@@ -29,7 +31,7 @@ const ProductsList = () => {
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this product?')) {
             try {
-                const response = await fetch(`https://album-backend-eta.vercel.app/api/products/${id}`, {
+                const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(id), {
                     method: 'DELETE'
                 });
                 if (response.ok) {
@@ -89,8 +91,8 @@ const ProductsList = () => {
                         >
                             <div className="col-span-8 flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-lg bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold text-sm flex-shrink-0 overflow-hidden">
-                                    {product.image ? (
-                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                    {product.image || (product.gallery && product.gallery[0]) ? (
+                                        <img src={getImageUrl(product.image || product.gallery[0])} alt={product.name} className="w-full h-full object-cover" />
                                     ) : (
                                         <Package className="w-6 h-6 text-zg-secondary" />
                                     )}

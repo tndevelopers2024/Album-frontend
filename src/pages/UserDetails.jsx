@@ -8,6 +8,7 @@ import {
     User, CreditCard, Globe, Hash
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import API_ENDPOINTS from '../api';
 
 const InfoCard = ({ icon: Icon, label, value, iconColor = "text-zg-accent" }) => (
     <div className="bg-zg-surface/30 border border-zg-secondary/10 rounded-xl p-4 hover:border-zg-secondary/20 transition-all">
@@ -62,7 +63,7 @@ const UserDetails = () => {
 
     const fetchUserDetails = async () => {
         try {
-            const response = await fetch(`https://album-backend-eta.vercel.app/api/users/${id}`);
+            const response = await fetch(API_ENDPOINTS.USER_BY_ID(id));
             if (response.ok) {
                 const data = await response.json();
                 setUser(data);
@@ -83,7 +84,7 @@ const UserDetails = () => {
 
     const handleVerify = async (action) => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/verify', {
+            const response = await fetch(API_ENDPOINTS.VERIFY, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: id, action })
@@ -99,7 +100,7 @@ const UserDetails = () => {
     const handleDelete = async () => {
         if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
             try {
-                const response = await fetch(`https://album-backend-eta.vercel.app/api/users/${id}`, {
+                const response = await fetch(API_ENDPOINTS.USER_BY_ID(id), {
                     method: 'DELETE'
                 });
                 if (response.ok) {

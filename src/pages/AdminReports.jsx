@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../datepicker.css';
+import API_ENDPOINTS from '../api';
 
 const StatCard = ({ title, value, icon: Icon, color }) => {
     const colorStyles = {
@@ -47,7 +48,7 @@ const AdminReports = () => {
 
     const fetchOrders = async () => {
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/orders');
+            const response = await fetch(API_ENDPOINTS.ORDERS);
             const data = await response.json();
             setOrders(data);
             setFilteredOrders(data);

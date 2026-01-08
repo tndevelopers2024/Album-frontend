@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, ShoppingBag } from 'lucide-react';
+import API_ENDPOINTS from '../api';
+import { getImageUrl } from '../utils/imageUtils';
 
 const ProductDetails = () => {
     const { productId } = useParams();
@@ -16,10 +18,12 @@ const ProductDetails = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(`https://album-backend-eta.vercel.app/api/products/${productId}`);
+            const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(productId));
             const data = await response.json();
             setProduct(data);
-            setMainImage(data.image);
+            // Use first gallery image if main image is empty
+            const imageToShow = data.image || (data.gallery && data.gallery[0]) || '';
+            setMainImage(imageToShow);
         } catch (error) {
             console.error('Error fetching product:', error);
         } finally {
@@ -59,7 +63,7 @@ const ProductDetails = () => {
                         {/* Main Image */}
                         <div className="aspect-[4/3] bg-zg-surface/50 rounded-2xl overflow-hidden border border-zg-secondary/10 relative group">
                             {mainImage ? (
-                                <img src={mainImage} alt={product.name} className="w-full h-full object-cover" />
+                                <img src={getImageUrl(mainImage)} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-zg-secondary">
                                     <ShoppingBag className="w-16 h-16 opacity-20" />
@@ -103,7 +107,7 @@ const ProductDetails = () => {
                                         className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${mainImage === img ? 'border-zg-accent' : 'border-transparent hover:border-zg-secondary/30'
                                             }`}
                                     >
-                                        <img src={img} alt={`View ${index + 1}`} className="w-full h-full object-cover" />
+                                        <img src={getImageUrl(img)} alt={`View ${index + 1}`} className="w-full h-full object-cover" />
                                     </button>
                                 ))}
                             </div>

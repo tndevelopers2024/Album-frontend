@@ -70,11 +70,11 @@ const Navbar = () => {
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-3 pl-4 border-l border-zg-secondary/20">
                                 <div className="text-right hidden lg:block">
-                                    <p className="text-sm font-bold text-zg-primary">{user.name}</p>
-                                    <p className="text-xs text-zg-secondary">{user.role}</p>
+                                    <p className="text-sm font-bold text-zg-primary">{user.name || user.email || 'User'}</p>
+                                    <p className="text-xs text-zg-secondary">{user.role || 'user'}</p>
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold border border-zg-secondary/20">
-                                    {user.name.charAt(0).toUpperCase()}
+                                    {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                                 </div>
                             </div>
                             <button
@@ -117,11 +117,11 @@ const Navbar = () => {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold">
-                                        {user.name.charAt(0).toUpperCase()}
+                                        {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <p className="font-bold text-zg-primary">{user.name}</p>
-                                        <p className="text-xs text-zg-secondary">{user.email}</p>
+                                        <p className="font-bold text-zg-primary">{user.name || user.email || 'User'}</p>
+                                        <p className="text-xs text-zg-secondary">{user.email || ''}</p>
                                     </div>
                                 </div>
                                 <button

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import API_ENDPOINTS from '../api';
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -22,7 +23,7 @@ const Login = () => {
         setError('');
 
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/login', {
+            const response = await fetch(API_ENDPOINTS.LOGIN, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

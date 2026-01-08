@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Upload } from 'lucide-react';
+import API_ENDPOINTS from '../api';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -30,7 +31,7 @@ const Register = () => {
 
         setUploading(true);
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/upload', {
+            const response = await fetch(API_ENDPOINTS.UPLOAD, {
                 method: 'POST',
                 body: uploadData
             });
@@ -56,7 +57,7 @@ const Register = () => {
         }
 
         try {
-            const response = await fetch('https://album-backend-eta.vercel.app/api/register', {
+            const response = await fetch(API_ENDPOINTS.REGISTER, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData),

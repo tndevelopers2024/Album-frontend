@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, Package, Calendar, Clock } from 'lucide-react';
+import API_ENDPOINTS from '../api';
 
 const MyOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -16,7 +17,7 @@ const MyOrders = () => {
                     return;
                 }
 
-                const response = await fetch(`https://album-backend-eta.vercel.app/api/orders/my-orders/${user.id}`);
+                const response = await fetch(API_ENDPOINTS.MY_ORDERS(user.id));
                 const data = await response.json();
                 setOrders(data);
             } catch (error) {

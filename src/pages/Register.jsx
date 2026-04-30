@@ -1,9 +1,34 @@
-import React, { useState } from 'react';
-import { Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, CheckCircle, XCircle, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 
+const Toast = ({ toast, onClose }) => {
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(onClose, toast.type === 'success' ? 3000 : 5000);
+        return () => clearTimeout(timer);
+    }, [toast, onClose]);
+
+    if (!toast) return null;
+
+    const isSuccess = toast.type === 'success';
+    return (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex items-start gap-3 px-5 py-4 rounded-xl shadow-2xl border min-w-[320px] max-w-md transition-all duration-300 ${isSuccess ? 'bg-green-950 border-green-500/40 text-green-300' : 'bg-red-950 border-red-500/40 text-red-300'}`}>
+            {isSuccess
+                ? <CheckCircle className="w-5 h-5 mt-0.5 shrink-0 text-green-400" />
+                : <XCircle className="w-5 h-5 mt-0.5 shrink-0 text-red-400" />}
+            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100 transition-opacity">
+                <X className="w-4 h-4" />
+            </button>
+        </div>
+    );
+};
+
 const Register = () => {
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -16,8 +41,10 @@ const Register = () => {
         logo: ''
     });
 
-    const [message, setMessage] = useState('');
+    const [toast, setToast] = useState(null);
     const [uploading, setUploading] = useState(false);
+
+    const showToast = (message, type) => setToast({ message, type });
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -40,11 +67,11 @@ const Register = () => {
             if (response.ok) {
                 setFormData(prev => ({ ...prev, logo: data.imageUrl }));
             } else {
-                setMessage('Logo upload failed');
+                showToast('Logo upload failed. Please try again.', 'error');
             }
         } catch (error) {
             console.error('Error uploading logo:', error);
-            setMessage('Error uploading logo');
+            showToast('Error uploading logo. Check your connection.', 'error');
         } finally {
             setUploading(false);
         }
@@ -53,7 +80,7 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (formData.password !== formData.confirmPassword) {
-            setMessage('Passwords do not match');
+            showToast('Passwords do not match. Please check and try again.', 'error');
             return;
         }
 
@@ -67,7 +94,7 @@ const Register = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage('Registration successful! Please wait for admin approval.');
+                showToast('Registration successful! Redirecting to login...', 'success');
                 setFormData({
                     name: '',
                     email: '',
@@ -79,15 +106,18 @@ const Register = () => {
                     confirmPassword: '',
                     logo: ''
                 });
+                setTimeout(() => navigate('/login'), 2500);
             } else {
-                setMessage(data.message || 'Registration failed');
+                showToast(data.message || 'Registration failed. Please try again.', 'error');
             }
         } catch (error) {
-            setMessage('Server error. Please try again later.');
+            showToast('Server error. Please try again later.', 'error');
         }
     };
 
     return (
+        <>
+        <Toast toast={toast} onClose={() => setToast(null)} />
         <div className="bg-zg-bg flex items-center justify-center px-4 py-20">
             <div className="w-full max-w-4xl bg-zg-surface border border-zg-secondary/10 rounded-2xl p-10 shadow-xl relative overflow-hidden">
 
@@ -100,18 +130,6 @@ const Register = () => {
                     <h1 className="text-4xl font-heading font-bold mb-3">Create Account</h1>
                     <p className="text-zg-secondary">Join us and start your journey</p>
                 </div>
-
-                {/* MESSAGE */}
-                {message && (
-                    <div
-                        className={`p-4 mb-8 rounded-lg text-sm font-medium text-center transition-all duration-300 ${message.includes('successful')
-                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                            }`}
-                    >
-                        {message}
-                    </div>
-                )}
 
                 {/* Registration Form */}
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
@@ -175,48 +193,32 @@ const Register = () => {
                     {/* Company Logo */}
                     <div className="md:col-span-2">
                         <label className="text-zg-secondary text-sm mb-2 block">Company Logo</label>
-                        <div className="space-y-3">
-                            {/* Upload Option */}
-                            <div className="flex gap-4 items-start">
-                                <div className="flex-1">
-                                    <div className="relative">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleLogoUpload}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                            disabled={uploading}
-                                        />
-                                        <div className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-700 text-zg-secondary flex items-center gap-2 hover:border-zg-accent transition-colors">
-                                            <Upload className="w-4 h-4" />
-                                            <span>{uploading ? 'Uploading...' : formData.logo ? 'Logo Uploaded' : 'Upload Logo'}</span>
-                                        </div>
+                        <div className="flex gap-4 items-start">
+                            <div className="flex-1">
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleLogoUpload}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        disabled={uploading}
+                                    />
+                                    <div className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-700 text-zg-secondary flex items-center gap-2 hover:border-zg-accent transition-colors">
+                                        <Upload className="w-4 h-4" />
+                                        <span>{uploading ? 'Uploading...' : formData.logo ? 'Logo Uploaded' : 'Upload Logo'}</span>
                                     </div>
-                                    <p className="text-xs text-zg-secondary mt-1">Recommended size: 200x200px. Max 2MB.</p>
                                 </div>
-                                {formData.logo && (
-                                    <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-700 overflow-hidden flex-shrink-0">
-                                        <img
-                                            src={getImageUrl(formData.logo)}
-                                            alt="Logo Preview"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                )}
+                                <p className="text-xs text-zg-secondary mt-1">Recommended size: 200x200px. Max 2MB.</p>
                             </div>
-
-                            {/* URL Option */}
-                            <div className="relative">
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zg-secondary text-xs">OR</div>
-                                <input
-                                    type="url"
-                                    name="logo"
-                                    value={formData.logo}
-                                    onChange={handleChange}
-                                    placeholder="Paste logo URL here"
-                                    className="w-full pl-12 pr-4 py-3 rounded-lg bg-zg-bg border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition placeholder:text-zg-secondary/30"
-                                />
-                            </div>
+                            {formData.logo && (
+                                <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-700 overflow-hidden flex-shrink-0">
+                                    <img
+                                        src={getImageUrl(formData.logo)}
+                                        alt="Logo Preview"
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -288,16 +290,17 @@ const Register = () => {
                 </form>
 
                 <div className="w-full flex items-center justify-center">
-                    <a href='/login' className="text-center w-full  text-zg-secondary text-sm ">
+                    <Link to='/login' className="text-center w-full text-zg-secondary text-sm">
                         Already have an account?{' '}
-                        <span className="text-zg-accent cursor-pointer hover:underline">
+                        <span className="text-zg-accent hover:underline">
                             Login
                         </span>
-                    </a>
+                    </Link>
                 </div>
 
             </div>
         </div>
+        </>
     );
 };
 

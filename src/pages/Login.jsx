@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import API_ENDPOINTS from '../api';
 
 const Login = () => {
@@ -115,12 +115,12 @@ const Login = () => {
 
                 {/* EXTRA */}
                 <div className="w-full flex items-center justify-center">
-                    <a href='/' className="text-center w-full  text-zg-secondary text-sm ">
+                    <Link to='/register' className="text-center w-full text-zg-secondary text-sm">
                         Don't have an account?{' '}
-                        <span className="text-zg-accent cursor-pointer hover:underline">
+                        <span className="text-zg-accent hover:underline">
                             Sign Up
                         </span>
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

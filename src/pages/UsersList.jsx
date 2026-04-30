@@ -413,14 +413,30 @@ const UsersList = () => {
             <ConfirmationModal
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ isOpen: false, userId: null, action: null, userName: '' })}
-                onConfirm={() => handleVerify(confirmModal.userId, confirmModal.action)}
-                title={confirmModal.action === 'approve' ? 'Approve User' : 'Reject User'}
+                onConfirm={() => {
+                    if (confirmModal.action === 'delete') {
+                        handleDelete(confirmModal.userId);
+                    } else {
+                        handleVerify(confirmModal.userId, confirmModal.action);
+                    }
+                }}
+                title={
+                    confirmModal.action === 'approve' ? 'Approve User' :
+                    confirmModal.action === 'reject' ? 'Reject User' :
+                    'Delete User'
+                }
                 message={
                     confirmModal.action === 'approve'
                         ? `Are you sure you want to approve ${confirmModal.userName}? They will gain access to the system.`
-                        : `Are you sure you want to reject ${confirmModal.userName}? They will not be able to access the system.`
+                        : confirmModal.action === 'reject'
+                        ? `Are you sure you want to reject ${confirmModal.userName}? They will not be able to access the system.`
+                        : `Are you sure you want to permanently delete ${confirmModal.userName}? This cannot be undone.`
                 }
-                confirmText={confirmModal.action === 'approve' ? 'Approve' : 'Reject'}
+                confirmText={
+                    confirmModal.action === 'approve' ? 'Approve' :
+                    confirmModal.action === 'reject' ? 'Reject' :
+                    'Delete'
+                }
                 type={confirmModal.action === 'approve' ? 'success' : 'danger'}
             />
         </DashboardLayout>

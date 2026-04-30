@@ -96,12 +96,20 @@ const Navbar = () => {
                             </button>
                         </div>
                     ) : (
-                        <Link
-                            to="/login"
-                            className="px-6 py-2.5 bg-zg-surface border border-zg-secondary/20 rounded-xl text-sm font-bold hover:border-zg-accent hover:text-zg-accent transition-all"
-                        >
-                            Login
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <Link
+                                to="/register"
+                                className="px-6 py-2.5 bg-zg-accent text-black rounded-xl text-sm font-bold hover:bg-zg-accent/90 transition-all"
+                            >
+                                Register
+                            </Link>
+                            <Link
+                                to="/login"
+                                className="px-6 py-2.5 bg-zg-surface border border-zg-secondary/20 rounded-xl text-sm font-bold hover:border-zg-accent hover:text-zg-accent transition-all"
+                            >
+                                Login
+                            </Link>
+                        </div>
                     )}
                 </div>
 
@@ -147,13 +155,22 @@ const Navbar = () => {
                                 </button>
                             </div>
                         ) : (
-                            <Link
-                                to="/login"
-                                className="block w-full py-3 bg-zg-accent text-black font-bold text-center rounded-xl"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Login
-                            </Link>
+                            <div className="space-y-3">
+                                <Link
+                                    to="/register"
+                                    className="block w-full py-3 bg-zg-accent text-black font-bold text-center rounded-xl"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Register
+                                </Link>
+                                <Link
+                                    to="/login"
+                                    className="block w-full py-3 bg-zg-surface border border-zg-secondary/20 text-zg-primary font-bold text-center rounded-xl"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Login
+                                </Link>
+                            </div>
                         )}
                     </div>
                 </div>

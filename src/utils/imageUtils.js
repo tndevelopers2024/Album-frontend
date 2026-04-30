@@ -1,6 +1,6 @@
-// Utility function to get full image URL from relative path
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5007';
+import { ASSET_URL } from '../api';
 
+// Utility function to get full image URL from relative path
 export const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
 
@@ -15,7 +15,8 @@ export const getImageUrl = (imagePath) => {
     }
 
     // Otherwise, prepend the backend URL for relative paths
-    return `${API_BASE_URL}${imagePath}`;
+    return `${ASSET_URL}${imagePath}`;
 };
 
 export default getImageUrl;
+

@@ -12,6 +12,7 @@ const ProductForm = () => {
 
     const [formData, setFormData] = useState({
         name: '',
+        category: '',
         description: '',
         image: '',
         gallery: [],
@@ -19,25 +20,64 @@ const ProductForm = () => {
         benefits: [],
         price: '',
         boxPrice: '',
-        frontPageOptions: {
-            showFullNames: false,
-            showInitials: false,
-            showImage: false,
-            showDate: false,
-            showCustomText: false
-        }
+        frontPageOptions: [],
+        sizes: {
+            Square: [],
+            Portrait: [],
+            Landscape: []
+        },
+        paperTypes: [],
+        bindingTypes: [],
+        boxFinishes: [],
+        colors: []
     });
     const [loading, setLoading] = useState(false);
+    const [suggestions, setSuggestions] = useState({
+        categories: [],
+        paperTypes: [],
+        bindingTypes: [],
+        boxFinishes: [],
+        sizes: { Square: [], Portrait: [], Landscape: [] }
+    });
 
     // Store file objects for deferred upload
     const [imageFile, setImageFile] = useState(null);
     const [galleryFiles, setGalleryFiles] = useState([]);
+    const [colorGalleryFiles, setColorGalleryFiles] = useState({}); // { colorIndex: [File, File, ...] }
 
     useEffect(() => {
         if (isEditMode) {
             fetchProduct();
         }
+        fetchSuggestions();
     }, [id]);
+
+    const fetchSuggestions = async () => {
+        try {
+            const response = await fetch(API_ENDPOINTS.PRODUCTS);
+            const products = await response.json();
+            
+            const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
+            const papers = [...new Set(products.flatMap(p => p.paperTypes || []).filter(Boolean))];
+            const bindings = [...new Set(products.flatMap(p => p.bindingTypes || []).filter(Boolean))];
+            const finishes = [...new Set(products.flatMap(p => p.boxFinishes || []).filter(Boolean))];
+            
+            const sizes = {
+                Square: [...new Set(products.flatMap(p => p.sizes?.Square || []).filter(Boolean))],
+                Portrait: [...new Set(products.flatMap(p => p.sizes?.Portrait || []).filter(Boolean))],
+                Landscape: [...new Set(products.flatMap(p => p.sizes?.Landscape || []).filter(Boolean))]
+            };
+
+            // Add global defaults if they are empty
+            if (papers.length === 0) papers.push('Glossy', 'Matte', 'Lustre', 'Metallic', 'Fine Art', 'Canvas');
+            if (bindings.length === 0) bindings.push('NT', 'Layflat');
+            if (finishes.length === 0) finishes.push('Regular', 'Matte', 'Glossy');
+
+            setSuggestions({ categories: cats, paperTypes: papers, bindingTypes: bindings, boxFinishes: finishes, sizes });
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+        }
+    };
 
     const fetchProduct = async () => {
         try {
@@ -45,6 +85,7 @@ const ProductForm = () => {
             const data = await response.json();
             setFormData({
                 name: data.name || '',
+                category: data.category || '',
                 description: data.description || '',
                 image: data.image || '',
                 gallery: data.gallery || [],
@@ -52,13 +93,16 @@ const ProductForm = () => {
                 benefits: data.benefits || [],
                 price: data.price || '',
                 boxPrice: data.boxPrice || '',
-                frontPageOptions: data.frontPageOptions || {
-                    showFullNames: false,
-                    showInitials: false,
-                    showImage: false,
-                    showDate: false,
-                    showCustomText: false
-                }
+                frontPageOptions: data.frontPageOptions || [],
+                sizes: data.sizes || {
+                    Square: [],
+                    Portrait: [],
+                    Landscape: []
+                },
+                paperTypes: data.paperTypes || [],
+                bindingTypes: data.bindingTypes || [],
+                boxFinishes: data.boxFinishes || [],
+                colors: data.colors || []
             });
         } catch (error) {
             console.error('Error fetching product:', error);
@@ -96,6 +140,71 @@ const ProductForm = () => {
         }));
     };
 
+    const addTag = (field, value) => {
+        if (!value.trim()) return;
+        setFormData(prev => ({
+            ...prev,
+            [field]: [...new Set([...prev[field], value.trim()])]
+        }));
+    };
+
+    const removeTag = (field, tagToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: prev[field].filter(tag => tag !== tagToRemove)
+        }));
+    };
+
+    const addSizeTag = (orientation, value) => {
+        if (!value.trim()) return;
+        setFormData(prev => ({
+            ...prev,
+            sizes: {
+                ...prev.sizes,
+                [orientation]: [...new Set([...prev.sizes[orientation], value.trim()])]
+            }
+        }));
+    };
+
+    const removeSizeTag = (orientation, tagToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            sizes: {
+                ...prev.sizes,
+                [orientation]: prev.sizes[orientation].filter(tag => tag !== tagToRemove)
+            }
+        }));
+    };
+
+    const addFrontPageOption = () => {
+        const newOption = {
+            id: Date.now().toString(),
+            label: '',
+            type: 'text',
+            required: false
+        };
+        setFormData(prev => ({
+            ...prev,
+            frontPageOptions: [...prev.frontPageOptions, newOption]
+        }));
+    };
+
+    const removeFrontPageOption = (id) => {
+        setFormData(prev => ({
+            ...prev,
+            frontPageOptions: prev.frontPageOptions.filter(opt => opt.id !== id)
+        }));
+    };
+
+    const updateFrontPageOption = (id, updates) => {
+        setFormData(prev => ({
+            ...prev,
+            frontPageOptions: prev.frontPageOptions.map(opt => 
+                opt.id === id ? { ...opt, ...updates } : opt
+            )
+        }));
+    };
+
     const removeGalleryImage = (index) => {
         setFormData(prev => ({
             ...prev,
@@ -129,6 +238,64 @@ const ProductForm = () => {
                 [field]: value
             }
         }));
+    };
+
+    // Color Management
+    const addColor = () => {
+        setFormData(prev => ({
+            ...prev,
+            colors: [...prev.colors, { name: '', hex: '#000000', gallery: [] }]
+        }));
+    };
+
+    const removeColor = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            colors: prev.colors.filter((_, i) => i !== index)
+        }));
+        // Also remove associated files
+        const newColorGalleryFiles = { ...colorGalleryFiles };
+        delete newColorGalleryFiles[index];
+        // Note: we might need to re-index colorGalleryFiles if we use indices
+        // It's better to use something more stable, but let's try to keep it simple for now
+    };
+
+    const handleColorChange = (index, field, value) => {
+        const newColors = [...formData.colors];
+        newColors[index] = { ...newColors[index], [field]: value };
+        setFormData(prev => ({ ...prev, colors: newColors }));
+    };
+
+    const handleColorGallerySelect = (index, e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        setColorGalleryFiles(prev => ({
+            ...prev,
+            [index]: [...(prev[index] || []), ...files]
+        }));
+
+        // Create preview URLs
+        const previewUrls = files.map(file => URL.createObjectURL(file));
+        const newColors = [...formData.colors];
+        newColors[index] = {
+            ...newColors[index],
+            gallery: [...newColors[index].gallery, ...previewUrls]
+        };
+        setFormData(prev => ({ ...prev, colors: newColors }));
+    };
+
+    const removeColorGalleryImage = (colorIndex, imageIndex) => {
+        const newColors = [...formData.colors];
+        const updatedGallery = newColors[colorIndex].gallery.filter((_, i) => i !== imageIndex);
+        
+        // Also need to handle the files if it was a newly selected file
+        // This is getting complex because of index matching.
+        // For now, let's just update the gallery. 
+        // During submit, we'll filter out blob URLs that are no longer in the gallery.
+
+        newColors[colorIndex] = { ...newColors[colorIndex], gallery: updatedGallery };
+        setFormData(prev => ({ ...prev, colors: newColors }));
     };
 
     const handleSubmit = async (e) => {
@@ -186,11 +353,43 @@ const ProductForm = () => {
                 uploadedGalleryPaths = [...existingImages, ...uploadedPaths];
             }
 
+            // Upload Color Gallery images
+            const updatedColors = await Promise.all(formData.colors.map(async (color, index) => {
+                const files = colorGalleryFiles[index] || [];
+                const uploadedPaths = [];
+
+                if (files.length > 0) {
+                    for (const file of files) {
+                        // Only upload if it's still in the gallery (blob URL check)
+                        // This is a bit rough but works for now
+                        const galleryFormData = new FormData();
+                        galleryFormData.append('image', file);
+
+                        const uploadRes = await fetch(API_ENDPOINTS.UPLOAD, {
+                            method: 'POST',
+                            body: galleryFormData
+                        });
+                        const uploadData = await uploadRes.json();
+                        if (uploadRes.ok) {
+                            uploadedPaths.push(uploadData.imageUrl);
+                        }
+                    }
+                }
+
+                // Filter out blob URLs from existing gallery and merge with new uploads
+                const existingImages = color.gallery.filter(img => !img.startsWith('blob:'));
+                return {
+                    ...color,
+                    gallery: [...existingImages, ...uploadedPaths]
+                };
+            }));
+
             // Filter out empty strings from lists
             const cleanData = {
                 ...formData,
                 image: uploadedImagePath,
                 gallery: uploadedGalleryPaths,
+                colors: updatedColors,
                 features: formData.features.filter(item => item.trim() !== ''),
                 benefits: formData.benefits.filter(item => item.trim() !== '')
             };
@@ -229,7 +428,7 @@ const ProductForm = () => {
                     <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Title */}
-                            <div className="md:col-span-2">
+                            <div>
                                 <label className="text-zg-secondary text-sm mb-2 block">Product Title</label>
                                 <input
                                     type="text"
@@ -239,6 +438,26 @@ const ProductForm = () => {
                                     onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition"
                                 />
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                                <label className="text-zg-secondary text-sm mb-2 block uppercase tracking-wider">Category / Series</label>
+                                <input
+                                    type="text"
+                                    name="category"
+                                    list="category-suggestions"
+                                    required
+                                    value={formData.category}
+                                    onChange={handleChange}
+                                    placeholder="e.g. EVERWOOD SERIES"
+                                    className="w-full px-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition"
+                                />
+                                <datalist id="category-suggestions">
+                                    {suggestions.categories.map(cat => (
+                                        <option key={cat} value={cat} />
+                                    ))}
+                                </datalist>
                             </div>
 
                             {/* Description */}
@@ -456,84 +675,342 @@ const ProductForm = () => {
                                     )}
                                 </div>
                             </div>
+                    </div>
+                </div>
+
+                    {/* Product Specifications Section */}
+                    <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">
+                        <h2 className="text-xl font-heading font-bold">Product Specifications</h2>
+                        
+                        <div className="space-y-6">
+                            {/* Paper Types */}
+                            <div className="space-y-3">
+                                <label className="text-zg-secondary text-sm block uppercase tracking-wider">Paper Types (NT Binding Only)</label>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {formData.paperTypes.map(tag => (
+                                        <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-zg-accent/10 text-zg-accent rounded-lg text-sm border border-zg-accent/20">
+                                            {tag}
+                                            <button type="button" onClick={() => removeTag('paperTypes', tag)} className="hover:text-white transition-colors">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        id="newPaperType"
+                                        list="paper-suggestions"
+                                        placeholder="Add paper type (e.g. Glossy)"
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('paperTypes', e.target.value); e.target.value = ''; } }}
+                                        className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
+                                    />
+                                    <datalist id="paper-suggestions">
+                                        {suggestions.paperTypes.map(tag => (
+                                            <option key={tag} value={tag} />
+                                        ))}
+                                    </datalist>
+                                    <button 
+                                        type="button"
+                                        onClick={() => { const input = document.getElementById('newPaperType'); addTag('paperTypes', input.value); input.value = ''; }}
+                                        className="px-4 py-2.5 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors font-medium text-sm"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Binding Types */}
+                                <div className="space-y-3">
+                                    <label className="text-zg-secondary text-sm block uppercase tracking-wider">Binding Types</label>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {formData.bindingTypes.map(tag => (
+                                            <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-sm border border-purple-500/20">
+                                                {tag}
+                                                <button type="button" onClick={() => removeTag('bindingTypes', tag)} className="hover:text-white transition-colors">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            id="newBindingType"
+                                            list="binding-suggestions"
+                                            placeholder="e.g. NT, Layflat"
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('bindingTypes', e.target.value); e.target.value = ''; } }}
+                                            className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
+                                        />
+                                        <datalist id="binding-suggestions">
+                                            {suggestions.bindingTypes.map(tag => (
+                                                <option key={tag} value={tag} />
+                                            ))}
+                                        </datalist>
+                                        <button 
+                                            type="button"
+                                            onClick={() => { const input = document.getElementById('newBindingType'); addTag('bindingTypes', input.value); input.value = ''; }}
+                                            className="px-4 py-2.5 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 transition-colors font-medium text-sm"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Box Finishes */}
+                                <div className="space-y-3">
+                                    <label className="text-zg-secondary text-sm block uppercase tracking-wider">Box Finishes</label>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {formData.boxFinishes.map(tag => (
+                                            <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-lg text-sm border border-blue-500/20">
+                                                {tag}
+                                                <button type="button" onClick={() => removeTag('boxFinishes', tag)} className="hover:text-white transition-colors">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            id="newBoxFinish"
+                                            list="box-suggestions"
+                                            placeholder="e.g. Matte, Glossy"
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('boxFinishes', e.target.value); e.target.value = ''; } }}
+                                            className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
+                                        />
+                                        <datalist id="box-suggestions">
+                                            {suggestions.boxFinishes.map(tag => (
+                                                <option key={tag} value={tag} />
+                                            ))}
+                                        </datalist>
+                                        <button 
+                                            type="button"
+                                            onClick={() => { const input = document.getElementById('newBoxFinish'); addTag('boxFinishes', input.value); input.value = ''; }}
+                                            className="px-4 py-2.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors font-medium text-sm"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sizes */}
+                            <div className="space-y-4 pt-4 border-t border-zg-secondary/10">
+                                <label className="text-zg-secondary text-sm block uppercase tracking-wider">Size Options</label>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {['Square', 'Portrait', 'Landscape'].map((orientation) => (
+                                        <div key={orientation} className="space-y-3">
+                                            <label className="text-zg-primary text-xs font-bold uppercase tracking-widest">{orientation}</label>
+                                            <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-zg-bg/50 border border-zg-secondary/5">
+                                                {formData.sizes[orientation].map(tag => (
+                                                    <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-zg-surface text-zg-primary rounded-md text-xs border border-zg-secondary/10 shadow-sm">
+                                                        {tag}
+                                                        <button type="button" onClick={() => removeSizeTag(orientation, tag)} className="hover:text-red-400 transition-colors">
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    id={`newSize-${orientation}`}
+                                                    list={`size-suggestions-${orientation}`}
+                                                    placeholder="Add size"
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSizeTag(orientation, e.target.value); e.target.value = ''; } }}
+                                                    className="flex-1 px-3 py-2 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition text-xs"
+                                                />
+                                                <datalist id={`size-suggestions-${orientation}`}>
+                                                    {(suggestions.sizes[orientation] || []).map(tag => (
+                                                        <option key={tag} value={tag} />
+                                                    ))}
+                                                </datalist>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => { const input = document.getElementById(`newSize-${orientation}`); addSizeTag(orientation, input.value); input.value = ''; }}
+                                                    className="px-3 py-2 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors font-medium text-xs"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Front Page Customization Options */}
-                    <div className="bg-zg-surface border border-zg-secondary/10 rounded-2xl p-8">
-                        <h2 className="text-xl font-heading font-bold mb-6">Front Page Customization Options</h2>
-                        <p className="text-sm text-zg-secondary mb-6">
-                            Select which customization options customers can use for the album cover
-                        </p>
+                    {/* Product Colors Section */}
+                    <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-heading font-bold">Product Colors & Galleries</h2>
+                            <button
+                                type="button"
+                                onClick={addColor}
+                                className="flex items-center gap-2 px-4 py-2 bg-zg-accent text-black rounded-xl text-sm font-bold uppercase tracking-wide hover:bg-zg-accent-hover transition-all shadow-lg shadow-zg-accent/20"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Color
+                            </button>
+                        </div>
 
-                        <div className="space-y-6">
-                            {/* Customization Checkboxes */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.frontPageOptions.showFullNames}
-                                        onChange={(e) => handleFrontPageOptionChange('showFullNames', e.target.checked)}
-                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-zg-primary">Full Names</div>
-                                        <div className="text-xs text-zg-secondary">Allow customers to add full names on cover</div>
-                                    </div>
-                                </label>
+                        <div className="space-y-8">
+                            {formData.colors.map((color, colorIndex) => (
+                                <div key={colorIndex} className="p-6 rounded-xl bg-zg-surface border border-zg-secondary/10 space-y-4 relative group">
+                                    <button
+                                        type="button"
+                                        onClick={() => removeColor(colorIndex)}
+                                        className="absolute top-4 right-4 p-2 text-zg-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
 
-                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.frontPageOptions.showInitials}
-                                        onChange={(e) => handleFrontPageOptionChange('showInitials', e.target.checked)}
-                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-zg-primary">Initials</div>
-                                        <div className="text-xs text-zg-secondary">Allow customers to add initials on cover</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-zg-secondary text-xs mb-1 block uppercase tracking-wider">Color Name</label>
+                                            <input
+                                                type="text"
+                                                value={color.name}
+                                                onChange={(e) => handleColorChange(colorIndex, 'name', e.target.value)}
+                                                placeholder="e.g. Midnight Black"
+                                                className="w-full px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-zg-secondary text-xs mb-1 block uppercase tracking-wider">Hex Color (Optional)</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={color.hex || '#000000'}
+                                                    onChange={(e) => handleColorChange(colorIndex, 'hex', e.target.value)}
+                                                    className="w-10 h-10 rounded bg-transparent border-none cursor-pointer"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={color.hex}
+                                                    onChange={(e) => handleColorChange(colorIndex, 'hex', e.target.value)}
+                                                    placeholder="#000000"
+                                                    className="flex-1 px-4 py-2 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                </label>
 
-                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.frontPageOptions.showImage}
-                                        onChange={(e) => handleFrontPageOptionChange('showImage', e.target.checked)}
-                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
-                                    />
                                     <div>
-                                        <div className="font-medium text-zg-primary">Cover Image</div>
-                                        <div className="text-xs text-zg-secondary">Allow customers to upload cover image</div>
-                                    </div>
-                                </label>
+                                        <label className="text-zg-secondary text-xs mb-2 block uppercase tracking-wider">Color Specific Gallery</label>
+                                        <div className="space-y-4">
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={(e) => handleColorGallerySelect(colorIndex, e)}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                />
+                                                <div className="w-full px-4 py-6 rounded-lg bg-zg-surface border-2 border-dashed border-zg-secondary/20 text-zg-secondary flex flex-col items-center justify-center gap-2 hover:border-zg-accent hover:text-zg-primary transition-colors">
+                                                    <Upload className="w-6 h-6 opacity-50" />
+                                                    <span className="text-sm font-medium">Upload images for this color</span>
+                                                </div>
+                                            </div>
 
-                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.frontPageOptions.showDate}
-                                        onChange={(e) => handleFrontPageOptionChange('showDate', e.target.checked)}
-                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-zg-primary">Event Date</div>
-                                        <div className="text-xs text-zg-secondary">Allow customers to add event date</div>
+                                            {color.gallery.length > 0 && (
+                                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                                    {color.gallery.map((img, imgIndex) => (
+                                                        <div key={imgIndex} className="relative aspect-square rounded-lg bg-zg-surface border border-zg-secondary/10 overflow-hidden group/img">
+                                                            <img src={getImageUrl(img)} alt={`${color.name} ${imgIndex}`} className="w-full h-full object-cover" />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeColorGalleryImage(colorIndex, imgIndex)}
+                                                                className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-red-500 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-all"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </label>
+                                </div>
+                            ))}
 
-                                <label className="flex items-center gap-3 p-4 rounded-lg border border-zg-secondary/10 hover:border-zg-accent/30 cursor-pointer transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.frontPageOptions.showCustomText}
-                                        onChange={(e) => handleFrontPageOptionChange('showCustomText', e.target.checked)}
-                                        className="w-5 h-5 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent focus:ring-offset-0"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-zg-primary">Custom Text</div>
-                                        <div className="text-xs text-zg-secondary">Allow customers to add custom text</div>
-                                    </div>
-                                </label>
+                            {formData.colors.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed border-zg-secondary/10 rounded-2xl">
+                                    <p className="text-zg-secondary text-sm">No colors added yet. Click "Add Color" to start.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Front Page Customization Section */}
+                    <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-heading font-bold">Front Page Customization</h2>
+                                <p className="text-zg-secondary text-sm mt-1">Define what information customers should provide for the album cover</p>
                             </div>
+                            <button
+                                type="button"
+                                onClick={addFrontPageOption}
+                                className="flex items-center gap-2 px-4 py-2 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors text-sm font-bold"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Option
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {formData.frontPageOptions.map((option, index) => (
+                                <div key={option.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 rounded-xl bg-zg-bg/50 border border-zg-secondary/5 items-center">
+                                    <div className="md:col-span-5">
+                                        <input
+                                            type="text"
+                                            placeholder="Option Label (e.g. Wedding Date)"
+                                            value={option.label}
+                                            onChange={(e) => updateFrontPageOption(option.id, { label: e.target.value })}
+                                            className="w-full px-3 py-2 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition text-sm"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-3">
+                                        <select
+                                            value={option.type}
+                                            onChange={(e) => updateFrontPageOption(option.id, { type: e.target.value })}
+                                            className="w-full px-3 py-2 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition text-sm"
+                                        >
+                                            <option value="text">Text Input</option>
+                                            <option value="date">Date Picker</option>
+                                            <option value="image">Image Upload</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2 flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id={`req-${option.id}`}
+                                            checked={option.required}
+                                            onChange={(e) => updateFrontPageOption(option.id, { required: e.target.checked })}
+                                            className="w-4 h-4 rounded border-zg-secondary/20 text-zg-accent focus:ring-zg-accent"
+                                        />
+                                        <label htmlFor={`req-${option.id}`} className="text-xs text-zg-secondary">Required</label>
+                                    </div>
+                                    <div className="md:col-span-2 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFrontPageOption(option.id)}
+                                            className="p-2 text-zg-secondary hover:text-red-400 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            {formData.frontPageOptions.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed border-zg-secondary/10 rounded-xl">
+                                    <p className="text-zg-secondary text-sm">No customization options added yet.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 

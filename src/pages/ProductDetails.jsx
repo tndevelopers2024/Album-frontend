@@ -11,6 +11,7 @@ const ProductDetails = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('features');
     const [mainImage, setMainImage] = useState('');
+    const [selectedColor, setSelectedColor] = useState(null);
 
     useEffect(() => {
         fetchProduct();
@@ -21,9 +22,15 @@ const ProductDetails = () => {
             const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(productId));
             const data = await response.json();
             setProduct(data);
-            // Use first gallery image if main image is empty
-            const imageToShow = data.image || (data.gallery && data.gallery[0]) || '';
-            setMainImage(imageToShow);
+            
+            // Set default view
+            if (data.colors && data.colors.length > 0) {
+                const firstColor = data.colors[0];
+                setSelectedColor(firstColor);
+                setMainImage(firstColor.gallery && firstColor.gallery.length > 0 ? firstColor.gallery[0] : (data.image || ''));
+            } else {
+                setMainImage(data.image || (data.gallery && data.gallery[0]) || '');
+            }
         } catch (error) {
             console.error('Error fetching product:', error);
         } finally {
@@ -43,7 +50,18 @@ const ProductDetails = () => {
         </div>
     );
 
-    const allImages = [product.image, ...(product.gallery || [])].filter(Boolean);
+    const colorImages = selectedColor ? (selectedColor.gallery || []) : [];
+    const baseImages = [product.image, ...(product.gallery || [])].filter(Boolean);
+    const allImages = colorImages.length > 0 ? colorImages : baseImages;
+
+    const handleColorSelect = (color) => {
+        setSelectedColor(color);
+        if (color.gallery && color.gallery.length > 0) {
+            setMainImage(color.gallery[0]);
+        } else {
+            setMainImage(product.image || (product.gallery && product.gallery[0]) || '');
+        }
+    };
 
     return (
         <div className="min-h-screen bg-zg-bg text-zg-primary">
@@ -122,6 +140,28 @@ const ProductDetails = () => {
                                 {product.description}
                             </p>
                         </div>
+
+                        {/* Color Selection */}
+                        {product.colors && product.colors.length > 0 && (
+                            <div className="space-y-4 pt-6 border-t border-zg-secondary/10">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-zg-secondary">Select Color</h3>
+                                <div className="flex flex-wrap gap-4">
+                                    {product.colors.map((color, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleColorSelect(color)}
+                                            className={`group flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all ${selectedColor?.name === color.name ? 'border-zg-accent bg-zg-accent/5' : 'border-zg-secondary/10 hover:border-zg-secondary/30'}`}
+                                        >
+                                            <div 
+                                                className="w-10 h-10 rounded-full border border-black/10 shadow-inner"
+                                                style={{ backgroundColor: color.hex || '#ccc' }}
+                                            />
+                                            <span className={`text-xs font-medium ${selectedColor?.name === color.name ? 'text-zg-primary' : 'text-zg-secondary'}`}>{color.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="pt-8 border-t border-zg-secondary/10 space-y-8">
                             <button

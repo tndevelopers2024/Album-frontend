@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload } from 'lucide-react';
 import API_ENDPOINTS from '../api';
+import getImageUrl from '../utils/imageUtils';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -195,7 +196,11 @@ const Register = () => {
                                 </div>
                                 {formData.logo && (
                                     <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-700 overflow-hidden flex-shrink-0">
-                                        <img src={formData.logo} alt="Logo Preview" className="w-full h-full object-cover" />
+                                        <img
+                                            src={getImageUrl(formData.logo)}
+                                            alt="Logo Preview"
+                                            className="w-full h-full object-cover"
+                                        />
                                     </div>
                                 )}
                             </div>

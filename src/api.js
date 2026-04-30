@@ -1,5 +1,6 @@
 // API Configuration
-const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5007'}/api`;
+const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5007';
+const API_BASE_URL = `${SERVER_URL}/api`;
 
 // Helper function to build full URL
 const buildUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;
@@ -31,7 +32,9 @@ export const API_ENDPOINTS = {
     ALBUM_PRICING: buildUrl('/album/pricing'),
 };
 
-// Export base URL for cases where custom endpoints are needed
+// Export base URLs
 export const API_BASE = API_BASE_URL;
+export const ASSET_URL = SERVER_URL;
 
 export default API_ENDPOINTS;
+

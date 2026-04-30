@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { User, Bell, Shield, Mail, Lock, Globe, Save, Camera } from 'lucide-react';
+import getImageUrl from '../utils/imageUtils';
 
 const AdminSettings = () => {
     const [activeTab, setActiveTab] = useState('profile');
@@ -80,7 +81,7 @@ const AdminSettings = () => {
                                 <div className="flex items-center gap-6">
                                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-zg-accent/20 to-purple-500/20 flex items-center justify-center text-zg-primary font-bold text-3xl border-2 border-zg-secondary/10">
                                         {settings.avatar ? (
-                                            <img src={settings.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                                            <img src={getImageUrl(settings.avatar)} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                                         ) : (
                                             settings.name.charAt(0)
                                         )}

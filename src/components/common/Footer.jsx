@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Twitter, Mail, Phone, MapPin } from 'lucide-react';
+import API_ENDPOINTS from '../../api';
 
 const Footer = () => {
+    const [categories, setCategories] = useState([]);
+
+    useEffect(() => {
+        fetch(API_ENDPOINTS.PRODUCTS)
+            .then(r => r.json())
+            .then(data => {
+                const cats = [...new Set(data.map(p => p.category).filter(Boolean))];
+                setCategories(cats.slice(0, 6));
+            })
+            .catch(() => {});
+    }, []);
+
     return (
         <footer className="bg-zg-surface border-t border-zg-secondary/10 pt-20 pb-10">
             <div className="max-w-7xl mx-auto px-6">
@@ -39,17 +52,37 @@ const Footer = () => {
                             <li><Link to="/shop" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Shop Albums</Link></li>
                             <li><Link to="/about" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">About Us</Link></li>
                             <li><Link to="/contact" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Contact</Link></li>
+                            <li><Link to="/my-orders" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">My Orders</Link></li>
                         </ul>
                     </div>
 
-                    {/* Services */}
+                    {/* Album Categories */}
                     <div>
-                        <h3 className="font-heading font-bold text-lg mb-6">Services</h3>
+                        <h3 className="font-heading font-bold text-lg mb-6">Our Albums</h3>
                         <ul className="space-y-4">
-                            <li><Link to="#" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Wedding Photography</Link></li>
-                            <li><Link to="#" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Portrait Sessions</Link></li>
-                            <li><Link to="#" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Event Coverage</Link></li>
-                            <li><Link to="#" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Custom Photo Books</Link></li>
+                            {categories.length > 0 ? (
+                                <>
+                                    {categories.map(cat => (
+                                        <li key={cat}>
+                                            <Link
+                                                to={`/shop?category=${encodeURIComponent(cat)}`}
+                                                className="text-zg-secondary hover:text-zg-accent transition-colors text-sm capitalize"
+                                            >
+                                                {cat}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                    <li>
+                                        <Link to="/shop" className="text-zg-accent hover:text-zg-accent-hover transition-colors text-sm font-medium">
+                                            View All →
+                                        </Link>
+                                    </li>
+                                </>
+                            ) : (
+                                <li>
+                                    <Link to="/shop" className="text-zg-secondary hover:text-zg-accent transition-colors text-sm">Browse All Albums</Link>
+                                </li>
+                            )}
                         </ul>
                     </div>
 
@@ -78,8 +111,8 @@ const Footer = () => {
                         © {new Date().getFullYear()} Albums by Zero Gravity. All rights reserved.
                     </p>
                     <div className="flex gap-6 text-xs text-zg-secondary">
-                        <Link to="#" className="hover:text-zg-primary transition-colors">Privacy Policy</Link>
-                        <Link to="#" className="hover:text-zg-primary transition-colors">Terms of Service</Link>
+                        <Link to="/privacy-policy" className="hover:text-zg-primary transition-colors">Privacy Policy</Link>
+                        <Link to="/terms" className="hover:text-zg-primary transition-colors">Terms of Service</Link>
                     </div>
                 </div>
             </div>

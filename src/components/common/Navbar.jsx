@@ -16,13 +16,22 @@ const Navbar = () => {
             setIsScrolled(window.scrollY > 20);
         };
         window.addEventListener('scroll', handleScroll);
-
-        // Check user login status
-        const storedUser = JSON.parse(localStorage.getItem('user'));
-        setUser(storedUser);
-
         return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        let storedUser = null;
+        try {
+            storedUser = JSON.parse(localStorage.getItem('user'));
+        } catch {
+            localStorage.removeItem('user');
+        }
+        setUser(storedUser);
     }, [location]);
+
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [location.pathname]);
 
     const handleLogout = () => {
         localStorage.removeItem('user');
@@ -46,6 +55,7 @@ const Navbar = () => {
                 <div className="hidden md:flex items-center gap-8">
                     <Link to="/" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">Home</Link>
                     <Link to="/shop" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">Shop</Link>
+                    <Link to="/about" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">About</Link>
                     <Link to="/contact" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">Contact</Link>
                     {user && (
                         <Link to="/my-orders" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">My Orders</Link>
@@ -109,6 +119,8 @@ const Navbar = () => {
                 <div className="md:hidden absolute top-full left-0 right-0 bg-zg-bg border-b border-zg-secondary/10 p-6 space-y-4 shadow-2xl">
                     <Link to="/" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
                     <Link to="/shop" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>Shop</Link>
+                    <Link to="/about" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
+                    <Link to="/contact" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
                     {user && (
                         <Link to="/my-orders" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>My Orders</Link>
                     )}

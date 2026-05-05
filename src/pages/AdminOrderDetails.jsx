@@ -67,24 +67,23 @@ const AdminOrderDetails = () => {
             {/* Print Template Component */}
             <OrderPrintTemplate order={order} />
 
-            <div className="no-print flex items-center justify-between mb-6">
-                <button
-                    onClick={() => navigate('/admin/orders')}
-                    className="flex items-center gap-2 text-zg-secondary hover:text-zg-primary transition-colors group"
-                >
-                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">Back to Orders</span>
-                </button>
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 px-4 py-2 bg-zg-accent text-black font-semibold rounded-xl hover:bg-zg-accent-hover transition-all"
-                >
-                    <Printer className="w-4 h-4" />
-                    <span>Print Order</span>
-                </button>
-            </div>
-
-            <div id="printable-order">
+            <div className="no-print">
+                <div className="flex items-center justify-between mb-6">
+                    <button
+                        onClick={() => navigate('/admin/orders')}
+                        className="flex items-center gap-2 text-zg-secondary hover:text-zg-primary transition-colors group"
+                    >
+                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-sm font-medium">Back to Orders</span>
+                    </button>
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-zg-accent text-black font-semibold rounded-xl hover:bg-zg-accent-hover transition-all"
+                    >
+                        <Printer className="w-4 h-4" />
+                        <span>Print Order</span>
+                    </button>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Main Info */}

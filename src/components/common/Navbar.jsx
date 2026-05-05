@@ -58,7 +58,7 @@ const Navbar = () => {
                     <Link to="/about" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">About</Link>
                     <Link to="/contact" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">Contact</Link>
                     {user && (
-                        <Link to="/my-orders" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">My Orders</Link>
+                        <Link to="/dashboard" className="text-sm font-medium text-zg-secondary hover:text-zg-primary transition-colors">Dashboard</Link>
                     )}
                 </div>
 
@@ -78,15 +78,15 @@ const Navbar = () => {
 
                     {user ? (
                         <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-3 pl-4 border-l border-zg-secondary/20">
+                            <Link to="/dashboard" className="flex items-center gap-3 pl-4 border-l border-zg-secondary/20 hover:opacity-80 transition-opacity">
                                 <div className="text-right hidden lg:block">
                                     <p className="text-sm font-bold text-zg-primary">{user.name || user.email || 'User'}</p>
-                                    <p className="text-xs text-zg-secondary">{user.role || 'user'}</p>
+                                    <p className="text-xs text-zg-secondary uppercase tracking-widest">{user.role || 'user'}</p>
                                 </div>
-                                <div className="w-10 h-10 rounded-full bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold border border-zg-secondary/20">
+                                <div className="w-10 h-10 rounded-full bg-zg-accent/10 flex items-center justify-center text-zg-accent font-bold border border-zg-accent/20">
                                     {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                                 </div>
-                            </div>
+                            </Link>
                             <button
                                 onClick={handleLogout}
                                 className="p-2 rounded-lg hover:bg-red-500/10 text-zg-secondary hover:text-red-500 transition-colors"
@@ -130,20 +130,20 @@ const Navbar = () => {
                     <Link to="/about" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
                     <Link to="/contact" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>Contact</Link>
                     {user && (
-                        <Link to="/my-orders" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>My Orders</Link>
+                        <Link to="/dashboard" className="block text-lg font-medium text-zg-primary" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
                     )}
                     <div className="pt-4 border-t border-zg-secondary/10">
                         {user ? (
                             <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold">
+                                <Link to="/dashboard" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
+                                    <div className="w-10 h-10 rounded-full bg-zg-accent/10 flex items-center justify-center text-zg-accent font-bold">
                                         {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
                                         <p className="font-bold text-zg-primary">{user.name || user.email || 'User'}</p>
-                                        <p className="text-xs text-zg-secondary">{user.email || ''}</p>
+                                        <p className="text-xs text-zg-secondary">View Dashboard</p>
                                     </div>
-                                </div>
+                                </Link>
                                 <button
                                     onClick={() => {
                                         handleLogout();

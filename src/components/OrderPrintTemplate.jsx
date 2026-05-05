@@ -3,22 +3,17 @@ import React from 'react';
 const OrderPrintTemplate = ({ order }) => {
     if (!order) return null;
 
-    const specs = [
-        { label: 'Size', value: order.size },
-        { label: 'Binding', value: order.bindingType },
-        { label: 'Paper', value: order.paperType },
-        { label: 'Sheets', value: order.sheetCount },
-        { label: 'Box', value: order.boxType },
-        order.albumColor && { label: 'Color', value: order.albumColor },
-        order.bagType && { label: 'Bag', value: order.bagType },
-        order.calendarType && { label: 'Calendar', value: order.calendarType },
-        order.coverType && { label: 'Cover', value: order.coverType },
-        order.additionalPaper && { label: 'Add. Paper', value: order.additionalPaper },
-    ].filter(Boolean);
-
-    const customization = order.frontPageCustomization || {};
-    const hasCustomization = customization.fullNames || customization.initials || customization.date || customization.customText;
-    const hasExtras = order.acrylicCalendar || order.replicaEbook;
+    const formatDate = (date) => {
+        if (!date) return '';
+        return new Date(date).toLocaleString('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        }).toUpperCase();
+    };
 
     return (
         <div className="print-template" style={{ display: 'none' }}>
@@ -26,213 +21,283 @@ const OrderPrintTemplate = ({ order }) => {
                 @media print {
                     @page {
                         size: A4 portrait;
-                        margin: 12mm 14mm;
+                        margin: 8mm;
                     }
-                    body * { visibility: hidden; }
-                    .print-template, .print-template * { visibility: visible; }
+                    body * { visibility: hidden !important; }
+                    .print-template, .print-template * { visibility: visible !important; }
                     .print-template {
                         display: block !important;
-                        position: fixed;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        background: white;
-                        color: black;
+                        position: fixed !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        background: white !important;
+                        color: black !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        z-index: 99999;
+                        overflow: visible !important;
                     }
-                    .no-print { display: none !important; }
+                    .no-print, .no-print * { display: none !important; }
                 }
 
-                .print-template {
-                    font-family: Arial, sans-serif;
-                    max-width: 182mm;
-                    margin: 0 auto;
+                .job-order-container {
+                    width: 100%;
+                    border: 1.5px solid #000;
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    font-size: 10px;
+                    line-height: 1.2;
+                    background: #fff;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                }
+
+                th, td {
+                    border: 1px solid #000;
+                    padding: 4px 6px;
+                    text-align: left;
+                    vertical-align: top;
+                    word-wrap: break-word;
+                    overflow: hidden;
+                }
+
+                .header-table td {
+                    width: 50%;
+                }
+
+                .label {
+                    font-weight: normal;
+                    color: #444;
+                    display: inline-block;
+                    width: 90px;
+                }
+
+                .value {
+                    font-weight: bold;
+                    color: #000;
+                    text-transform: uppercase;
+                }
+
+                .main-spec-table th {
+                    background-color: #f0f0f0;
+                    text-align: center;
+                    font-size: 7.5px;
+                    font-weight: bold;
+                    padding: 4px 2px;
+                }
+
+                .main-spec-table td {
+                    text-align: center;
                     font-size: 9px;
-                    line-height: 1.4;
-                    color: #111;
-                    background: white;
+                    padding: 6px 2px;
                 }
 
-                .ph { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-                .ph-logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
-                .ph-sub { font-size: 8px; color: #555; margin-top: 2px; }
-                .ph-right { text-align: right; }
-                .ph-order { font-size: 14px; font-weight: 800; }
-                .ph-date { font-size: 8px; color: #555; margin-top: 2px; }
-                .ph-status { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px; font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-                .status-pending { background: #fff3cd; color: #856404; }
-                .status-processing { background: #cfe2ff; color: #084298; }
-                .status-completed { background: #d1e7dd; color: #0f5132; }
-                .status-cancelled { background: #f8d7da; color: #842029; }
+                .sub-info {
+                    font-size: 7px;
+                    color: #0066cc;
+                    margin-top: 2px;
+                    line-height: 1;
+                    font-weight: normal;
+                }
 
-                .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; }
-                .row3-cell { padding: 7px 9px; border-right: 1px solid #ddd; }
-                .row3-cell:last-child { border-right: none; }
-                .cell-title { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
-                .field { margin-bottom: 4px; }
-                .fl { font-size: 7px; color: #777; text-transform: uppercase; font-weight: 600; }
-                .fv { font-size: 9px; color: #111; }
+                .job-done-header {
+                    background-color: #f0f0f0;
+                    text-align: center;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    padding: 5px;
+                    border-top: 1.5px solid #000;
+                    border-bottom: 1px solid #000;
+                }
 
-                .section { margin-bottom: 8px; }
-                .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 6px; }
+                .job-done-table td {
+                    height: 24px;
+                }
 
-                .specs-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px 8px; }
-                .spec-item { }
+                .billing-label {
+                    text-align: right;
+                    width: 80%;
+                    font-weight: normal;
+                }
 
-                .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+                .billing-value {
+                    width: 20%;
+                    text-align: right;
+                    font-weight: bold;
+                }
 
-                .custom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+                .remarks-section {
+                    padding: 10px;
+                    border-top: 1px solid #000;
+                }
 
-                .price-box { border: 1.5px solid #111; border-radius: 4px; padding: 7px 10px; display: flex; justify-content: space-between; align-items: center; }
-                .price-label { font-size: 9px; font-weight: 700; text-transform: uppercase; }
-                .price-value { font-size: 18px; font-weight: 900; }
-
-                .asset-link { font-size: 7.5px; color: #1a56db; word-break: break-all; margin-top: 2px; }
-
-                .extras-row { display: flex; gap: 16px; margin-top: 3px; }
-                .extra-item { display: flex; align-items: center; gap: 4px; font-size: 8.5px; }
-                .check { display: inline-block; width: 10px; height: 10px; border: 1px solid #aaa; border-radius: 2px; text-align: center; line-height: 10px; font-size: 8px; }
-                .check.yes { background: #0f5132; border-color: #0f5132; color: white; }
-
-                .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #ddd; text-align: center; font-size: 7.5px; color: #777; }
+                .footer-sign {
+                    display: flex;
+                    justify-content: flex-end;
+                    padding: 20px 40px;
+                }
             `}</style>
 
-            {/* Header */}
-            <div className="ph">
-                <div>
-                    <div className="ph-logo">Zero Gravity Albums</div>
-                    <div className="ph-sub">Premium Custom Orders</div>
+            <div className="job-order-container">
+                {/* Top Header */}
+                <table className="header-table">
+                    <tbody>
+                        <tr>
+                            <td><span className="label">Job Type :</span> <span className="value">Album</span></td>
+                            <td><span className="label">Job Name :</span> <span className="value">{order.product?.name || 'N/A'}</span></td>
+                        </tr>
+                        <tr>
+                            <td><span className="label">Order Date :</span> <span className="value">{formatDate(order.createdAt)}</span></td>
+                            <td><span className="label">Order Number :</span> <span className="value">ZG{order._id.slice(-6).toUpperCase()}</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Customer & Delivery */}
+                <table>
+                    <tbody>
+                        <tr>
+                            <td style={{ width: '50%' }}>
+                                <div><span className="label">Customer:</span> <span className="value">{order.user?.name}</span></div>
+                                {order.user?.businessName && <div><span className="label">Business:</span> <span className="value">{order.user.businessName}</span></div>}
+                                <div><span className="label">Address:</span> <span className="value">{order.deliveryAddress?.city || 'N/A'}</span></div>
+                                <div><span className="label">Mobile:</span> <span className="value">{order.user?.phone || order.deliveryAddress?.phone || 'N/A'}</span></div>
+                            </td>
+                            <td style={{ width: '50%' }}>
+                                <div><span className="label">Delivery Date:</span> <span className="value">{formatDate(order.createdAt)}</span></div>
+                                <div><span className="label">Delivery Type:</span> <span className="value">COURIER B2B</span></div>
+                                <div><span className="label">Address:</span> <span className="value">{order.deliveryAddress?.state || 'N/A'}</span></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Main Spec Table */}
+                <table className="main-spec-table">
+                    <thead>
+                        <tr>
+                            <th style={{ width: '3%' }}>S.NO</th>
+                            <th style={{ width: '10%' }}>SIZE</th>
+                            <th style={{ width: '8%' }}>SHEET TYPE</th>
+                            <th style={{ width: '10%' }}>PRINT MACHINE TYPE</th>
+                            <th style={{ width: '10%' }}>LAMINATE TYPE</th>
+                            <th style={{ width: '10%' }}>PAD TYPE</th>
+                            <th style={{ width: '8%' }}>PAD COLOUR</th>
+                            <th style={{ width: '8%' }}>BOX TYPE</th>
+                            <th style={{ width: '8%' }}>BOX COLOUR</th>
+                            <th style={{ width: '8%' }}>BAG</th>
+                            <th style={{ width: '5%' }}>QTY</th>
+                            <th style={{ width: '12%' }}>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td className="value">
+                                {order.size}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                {order.bindingType}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                HP - INDIGO
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                {order.paperType}
+                                <div className="sub-info">(Qty: {order.sheetCount})</div>
+                                <div className="sub-info">Amt: {((order.calculatedPrice - (order.product?.boxPrice || 500)) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                            </td>
+                            <td className="value">
+                                {order.coverType || 'LEATHER PAD'}
+                                <div className="sub-info">(Qty: 1)</div>
+                                <div className="sub-info">Amt: {(order.product?.boxPrice || 500).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                            </td>
+                            <td className="value">
+                                {order.albumColor || 'BLUE'}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                {order.boxType || 'LEATHER BOX'}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                {order.albumColor || 'BLUE'}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">
+                                {order.bagType || 'JUTE BAG'}
+                                <div className="sub-info">(Qty: 1)</div>
+                            </td>
+                            <td className="value">{order.quantity}</td>
+                            <td className="value" style={{ textAlign: 'right' }}>{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Job Done Details */}
+                <div className="job-done-header">Job Done Details</div>
+                <table className="job-done-table">
+                    <thead>
+                        <tr>
+                            <th style={{ width: '30%' }}>Department</th>
+                            <th style={{ width: '25%' }}>Staff Name</th>
+                            <th style={{ width: '20%' }}>Signature</th>
+                            <th style={{ width: '25%' }}>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {['CC/DESIGN', 'PRINT', 'LAMINATION', 'CAKE', 'WRAPPER', 'QC', 'DISPATCH'].map(dept => (
+                            <tr key={dept}>
+                                <td style={{ fontWeight: 'bold' }}>{dept}</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {/* Billing Summary */}
+                <table>
+                    <tbody>
+                        <tr>
+                            <td className="billing-label">Delivery Charges :</td>
+                            <td className="billing-value">0.00</td>
+                        </tr>
+                        <tr>
+                            <td className="billing-label">Order Amount :</td>
+                            <td className="billing-value">{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr>
+                            <td className="billing-label">Advance :</td>
+                            <td className="billing-value">0.00</td>
+                        </tr>
+                        <tr>
+                            <td className="billing-label">Balance :</td>
+                            <td className="billing-value">{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Remarks & Footer */}
+                <div className="remarks-section">
+                    <span className="label" style={{ width: 'auto', marginRight: 5 }}>Remarks :</span>
+                    <span className="fv">{order.title}</span>
                 </div>
-                <div className="ph-right">
-                    <div className="ph-order">ORDER #{order._id.slice(-8).toUpperCase()}</div>
-                    <div className="ph-date">
-                        {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+
+                <div className="footer-sign">
+                    <div style={{ textAlign: 'right' }}>
+                        <span className="label" style={{ width: 'auto' }}>Order Taken By :</span>
+                        <span className="value" style={{ marginLeft: 10 }}>Admin</span>
                     </div>
-                    <div>
-                        <span className={`ph-status status-${order.status}`}>{order.status}</span>
-                    </div>
                 </div>
-            </div>
-
-            {/* Customer / Delivery / Order Info */}
-            <div className="row3">
-                <div className="row3-cell">
-                    <div className="cell-title">Customer</div>
-                    <div className="fv" style={{ fontWeight: 700 }}>{order.user?.name || 'N/A'}</div>
-                    <div className="fv" style={{ fontSize: '8px', color: '#555' }}>{order.user?.email || ''}</div>
-                    {order.user?.businessName && <div className="fv" style={{ fontSize: '8px', marginTop: 3 }}>{order.user.businessName}</div>}
-                    {order.user?.phone && <div className="fv" style={{ fontSize: '8px', color: '#555' }}>{order.user.phone}</div>}
-                </div>
-                <div className="row3-cell">
-                    <div className="cell-title">Delivery</div>
-                    {order.deliveryAddress ? (
-                        <>
-                            <div className="fv" style={{ fontWeight: 700 }}>{order.deliveryAddress.name}</div>
-                            <div className="fv" style={{ fontSize: '8px', color: '#555' }}>{order.deliveryAddress.phone}</div>
-                            <div className="fv" style={{ fontSize: '8px', marginTop: 3 }}>
-                                {order.deliveryAddress.address},<br />
-                                {order.deliveryAddress.city}, {order.deliveryAddress.state} {order.deliveryAddress.pincode}
-                            </div>
-                        </>
-                    ) : <div className="fv" style={{ color: '#999' }}>Not provided</div>}
-                </div>
-                <div className="row3-cell">
-                    <div className="cell-title">Order Info</div>
-                    <div className="field">
-                        <div className="fl">Product</div>
-                        <div className="fv">{order.product?.name || 'N/A'}</div>
-                    </div>
-                    <div className="field">
-                        <div className="fl">Quantity</div>
-                        <div className="fv">{order.quantity}</div>
-                    </div>
-                    <div className="field">
-                        <div className="fl">Album Title</div>
-                        <div className="fv">{order.title}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Album Specifications */}
-            <div className="section">
-                <div className="section-title">Album Specifications</div>
-                <div className="specs-grid">
-                    {specs.map(({ label, value }) => (
-                        <div className="spec-item" key={label}>
-                            <div className="fl">{label}</div>
-                            <div className="fv">{value}</div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Customization / Extras / Assets / Price */}
-            <div className="row2">
-                <div>
-                    {(hasCustomization || hasExtras) && (
-                        <div className="section">
-                            <div className="section-title">Customization & Extras</div>
-                            {hasCustomization && (
-                                <div className="custom-grid">
-                                    {customization.fullNames && (
-                                        <div className="field"><div className="fl">Names</div><div className="fv">{customization.fullNames}</div></div>
-                                    )}
-                                    {customization.initials && (
-                                        <div className="field"><div className="fl">Initials</div><div className="fv">{customization.initials}</div></div>
-                                    )}
-                                    {customization.date && (
-                                        <div className="field"><div className="fl">Event Date</div><div className="fv">{new Date(customization.date).toLocaleDateString('en-IN')}</div></div>
-                                    )}
-                                    {customization.customText && (
-                                        <div className="field" style={{ gridColumn: '1/-1' }}><div className="fl">Custom Text</div><div className="fv">{customization.customText}</div></div>
-                                    )}
-                                </div>
-                            )}
-                            {hasExtras && (
-                                <div className="extras-row" style={{ marginTop: hasCustomization ? 6 : 0 }}>
-                                    <div className="extra-item">
-                                        <span className={`check ${order.acrylicCalendar ? 'yes' : ''}`}>{order.acrylicCalendar ? '✓' : ''}</span>
-                                        Acrylic Calendar
-                                    </div>
-                                    <div className="extra-item">
-                                        <span className={`check ${order.replicaEbook ? 'yes' : ''}`}>{order.replicaEbook ? '✓' : ''}</span>
-                                        Replica E-Book
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                <div>
-                    {(order.imageLink || order.logo) && (
-                        <div className="section">
-                            <div className="section-title">Assets</div>
-                            {order.imageLink && (
-                                <div className="field">
-                                    <div className="fl">Image Link</div>
-                                    <div className="asset-link">{order.imageLink}</div>
-                                </div>
-                            )}
-                            {order.logo && (
-                                <div className="field" style={{ marginTop: 4 }}>
-                                    <div className="fl">Logo</div>
-                                    <div className="fv">✓ Logo uploaded</div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {order.calculatedPrice > 0 && (
-                        <div className="price-box">
-                            <div className="price-label">Total Amount</div>
-                            <div className="price-value">₹{order.calculatedPrice?.toLocaleString('en-IN')}</div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="footer">
-                Thank you for your order! &nbsp;|&nbsp; For queries: support@zerogravity.com
             </div>
         </div>
     );

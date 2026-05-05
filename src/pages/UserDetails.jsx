@@ -10,6 +10,8 @@ import {
 import { motion } from 'framer-motion';
 import API_ENDPOINTS from '../api';
 
+import getImageUrl from '../utils/imageUtils';
+
 const InfoCard = ({ icon: Icon, label, value, iconColor = "text-zg-accent" }) => (
     <div className="bg-zg-surface/30 border border-zg-secondary/10 rounded-xl p-4 hover:border-zg-secondary/20 transition-all">
         <div className="flex items-start gap-3">
@@ -166,7 +168,7 @@ const UserDetails = () => {
                             <div className="absolute -bottom-12 left-8">
                                 <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-zg-accent/30 to-purple-500/30 flex items-center justify-center text-zg-primary font-bold text-3xl border-4 border-zg-surface backdrop-blur-xl overflow-hidden">
                                     {user.logo ? (
-                                        <img src={user.logo} alt={user.businessName} className="w-full h-full object-cover" />
+                                        <img src={getImageUrl(user.logo)} alt={user.businessName} className="w-full h-full object-cover" />
                                     ) : (
                                         user.name.charAt(0)
                                     )}

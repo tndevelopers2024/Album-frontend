@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Search, ArrowRight, BookOpen, SlidersHorizontal, X } from 'lucide-react';
+import { ShoppingBag, Search, ArrowRight, BookOpen, SlidersHorizontal, X, Heart } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import { getImageUrl } from '../utils/imageUtils';
 
@@ -25,6 +25,7 @@ const SORT_OPTIONS = [
 
 const Shop = () => {
     const [products, setProducts] = useState([]);
+    const [favorites, setFavorites] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
@@ -34,12 +35,52 @@ const Shop = () => {
     const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        fetch(API_ENDPOINTS.PRODUCTS)
-            .then(r => r.json())
-            .then(data => setProducts(data))
-            .catch(() => {})
-            .finally(() => setLoading(false));
+        const user = JSON.parse(localStorage.getItem('user'));
+        
+        const fetchInitialData = async () => {
+            try {
+                const [productsRes, favsRes] = await Promise.all([
+                    fetch(API_ENDPOINTS.PRODUCTS),
+                    user ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ json: () => [] })
+                ]);
+                
+                const productsData = await productsRes.json();
+                const favsData = user ? await favsRes.json() : [];
+                
+                setProducts(productsData);
+                setFavorites(favsData.map(f => f._id));
+            } catch (error) {
+                console.error('Error loading data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInitialData();
     }, []);
+
+    const handleToggleFavorite = async (e, productId) => {
+        e.stopPropagation();
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const res = await fetch(API_ENDPOINTS.TOGGLE_FAVORITE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, productId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setFavorites(data.favorites);
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
+    };
 
     // Pre-select category from URL param (e.g. /shop?category=Premium+Series)
     useEffect(() => {
@@ -257,6 +298,7 @@ const Shop = () => {
                                         <img
                                             src={getImageUrl(product.image || product.gallery[0])}
                                             alt={product.name}
+                                            loading="lazy"
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />
                                     ) : (
@@ -271,6 +313,17 @@ const Shop = () => {
                                             </span>
                                         </div>
                                     )}
+                                    {/* Favorite Toggle */}
+                                    <button
+                                        onClick={(e) => handleToggleFavorite(e, product._id)}
+                                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md border transition-all z-10 ${
+                                            favorites.includes(product._id)
+                                                ? 'bg-zg-accent text-black border-zg-accent shadow-lg shadow-zg-accent/20'
+                                                : 'bg-black/20 text-white border-white/20 hover:bg-white/20'
+                                        }`}
+                                    >
+                                        <Heart className={`w-4 h-4 ${favorites.includes(product._id) ? 'fill-current' : ''}`} />
+                                    </button>
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
                                         <span className="inline-flex items-center gap-2 text-white font-bold text-sm">
                                             View Details <ArrowRight className="w-4 h-4" />
@@ -284,14 +337,7 @@ const Shop = () => {
                                     <p className="text-zg-secondary text-sm line-clamp-2 leading-relaxed">
                                         {product.description || 'Premium custom photo album crafted to preserve your memories.'}
                                     </p>
-                                    <div className="mt-5 flex items-center justify-between">
-                                        {product.price ? (
-                                            <span className="text-sm font-bold text-zg-primary">
-                                                From ₹{product.price.toLocaleString('en-IN')}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-zg-secondary uppercase tracking-widest font-bold">Custom Order</span>
-                                        )}
+                                    <div className="mt-5 flex items-center justify-end">
                                         <div className="w-8 h-8 rounded-full bg-zg-accent/10 flex items-center justify-center text-zg-accent group-hover:bg-zg-accent group-hover:text-black transition-all">
                                             <ArrowRight className="w-4 h-4" />
                                         </div>

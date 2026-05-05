@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, Package, Calendar, Clock } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 
+import getImageUrl from '../utils/imageUtils';
+
 const MyOrders = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -74,7 +76,7 @@ const MyOrders = () => {
                                     {/* Product Image */}
                                     <div className="w-full md:w-32 h-32 bg-zg-secondary/10 rounded-xl overflow-hidden flex-shrink-0">
                                         {order.product?.image ? (
-                                            <img src={order.product.image} alt={order.product.name} className="w-full h-full object-cover" />
+                                            <img src={getImageUrl(order.product.image)} alt={order.product.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
                                                 <Package className="w-8 h-8 text-zg-secondary/50" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, ShoppingBag } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ShoppingBag, Heart } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import { getImageUrl } from '../utils/imageUtils';
 
@@ -12,6 +12,7 @@ const ProductDetails = () => {
     const [activeTab, setActiveTab] = useState('features');
     const [mainImage, setMainImage] = useState('');
     const [selectedColor, setSelectedColor] = useState(null);
+    const [isFavorite, setIsFavorite] = useState(false);
 
     useEffect(() => {
         fetchProduct();
@@ -19,9 +20,17 @@ const ProductDetails = () => {
 
     const fetchProduct = async () => {
         try {
-            const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(productId));
-            const data = await response.json();
+            const user = JSON.parse(localStorage.getItem('user'));
+            const [productRes, favsRes] = await Promise.all([
+                fetch(API_ENDPOINTS.PRODUCT_BY_ID(productId)),
+                user ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ json: () => [] })
+            ]);
+
+            const data = await productRes.json();
+            const favs = user ? await favsRes.json() : [];
+
             setProduct(data);
+            setIsFavorite(favs.some(f => f._id === productId));
             
             // Set default view
             if (data.colors && data.colors.length > 0) {
@@ -35,6 +44,27 @@ const ProductDetails = () => {
             console.error('Error fetching product:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleToggleFavorite = async () => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const res = await fetch(API_ENDPOINTS.TOGGLE_FAVORITE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, productId })
+            });
+            if (res.ok) {
+                setIsFavorite(!isFavorite);
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
         }
     };
 
@@ -87,6 +117,18 @@ const ProductDetails = () => {
                                     <ShoppingBag className="w-16 h-16 opacity-20" />
                                 </div>
                             )}
+
+                            {/* Favorite Toggle */}
+                            <button
+                                onClick={handleToggleFavorite}
+                                className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md border transition-all z-10 ${
+                                    isFavorite
+                                        ? 'bg-zg-accent text-black border-zg-accent shadow-lg shadow-zg-accent/20'
+                                        : 'bg-black/20 text-white border-white/20 hover:bg-white/20'
+                                }`}
+                            >
+                                <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+                            </button>
 
                             {/* Navigation Arrows */}
                             {allImages.length > 1 && (

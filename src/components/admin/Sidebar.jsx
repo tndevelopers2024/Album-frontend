@@ -7,8 +7,10 @@ import {
     Package,
     FileBarChart,
     Settings,
+    Sliders,
     LogOut,
-    ChevronRight
+    ChevronRight,
+    IndianRupee
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -20,7 +22,9 @@ const Sidebar = () => {
         { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
         { name: 'Users', path: '/admin/users', icon: Users },
         { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
+        { name: 'Payments', path: '/admin/payments', icon: IndianRupee },
         { name: 'Products', path: '/admin/products', icon: Package },
+        { name: 'Master Specs', path: '/admin/master-specs', icon: Sliders },
         { name: 'Reports', path: '/admin/reports', icon: FileBarChart },
         { name: 'Settings', path: '/admin/settings', icon: Settings },
     ];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Upload, CheckCircle, XCircle, IndianRupee, Check, AlertCircle, CheckCircle2, BookOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, XCircle, IndianRupee, Check, AlertCircle, CheckCircle2, BookOpen, Minus, Plus } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 
@@ -43,7 +43,8 @@ const OrderForm = () => {
             pincode: '',
             country: 'India'
         },
-        frontPageCustomization: {}
+        frontPageCustomization: {},
+        dynamicSpecs: {}
     });
 
     const steps = [
@@ -68,7 +69,28 @@ const OrderForm = () => {
         }
     }, [toast.show]);
 
-    useEffect(() => { if (pricing && product) calculatePrice(); }, [formData.bindingType, formData.paperType, formData.sheetCount, pricing, product]);
+    useEffect(() => { if (pricing && product) calculatePrice(); }, [formData.bindingType, formData.paperType, formData.sheetCount, formData.dynamicSpecs, pricing, product]);
+
+    // Clear size selections when Layflat is chosen (sizes don't apply)
+    useEffect(() => {
+        if (!product) return;
+        const bindingSpec = (product.specifications || []).find(
+            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
+        );
+        if (!bindingSpec) return;
+        const selectedBinding = formData.dynamicSpecs[bindingSpec.spec._id];
+        if (selectedBinding !== 'Layflat') return;
+        const sizeSpecIds = (product.specifications || [])
+            .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
+            .map(({ spec }) => spec._id);
+        const hasAnySize = sizeSpecIds.some(id => formData.dynamicSpecs[id] !== undefined);
+        if (!hasAnySize) return;
+        setFormData(p => {
+            const updatedDynamic = { ...p.dynamicSpecs };
+            sizeSpecIds.forEach(id => { delete updatedDynamic[id]; });
+            return { ...p, dynamicSpecs: updatedDynamic };
+        });
+    }, [formData.dynamicSpecs, product]);
 
     const fetchProduct = async () => {
         try {
@@ -88,17 +110,48 @@ const OrderForm = () => {
     };
 
     const calculatePrice = () => {
-        if (!pricing) return;
-        const { bindingType, paperType, sheetCount } = formData;
+        if (!pricing || !product) return;
+
+        // Find binding and paper specs by label to get their MongoDB IDs
+        const bindingSpecEntry = (product.specifications || []).find(
+            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
+        );
+        const paperSpecEntry = (product.specifications || []).find(
+            ({ spec }) => spec?.label?.toLowerCase().includes('paper')
+        );
+        const bindingSpecId = bindingSpecEntry?.spec?._id;
+        const paperSpecId = paperSpecEntry?.spec?._id;
+
+        const bindingType = (bindingSpecId ? formData.dynamicSpecs[bindingSpecId] : null) || formData.bindingType;
+        const paperType = (paperSpecId ? formData.dynamicSpecs[paperSpecId] : null) || formData.paperType;
+        const sheetCount = formData.sheetCount;
+
         let sheetCost = 0;
         if (bindingType === 'Layflat') {
-            sheetCost = pricing.sheetTypes.Layflat.pricePerSheet * sheetCount;
+            sheetCost = (pricing.sheetTypes?.Layflat?.pricePerSheet || 0) * sheetCount;
         } else if (bindingType === 'NT' && paperType) {
-            sheetCost = (pricing.sheetTypes.NT.paperTypes[paperType] || 80) * sheetCount;
+            const paperOption = paperSpecEntry?.spec?.options?.find(o => o.label === paperType);
+            sheetCost = (paperOption?.price || 0) * sheetCount;
         }
+
         const coverBoxCost = product?.boxPrice || 0;
-        const totalPrice = sheetCost + coverBoxCost;
-        setPriceBreakdown({ sheetCost, coverBoxCost, totalPrice });
+
+        // Dynamic specs cost — skip binding and paper specs (already in sheetCost)
+        let dynamicSpecsCost = 0;
+        if (product?.specifications) {
+            product.specifications.forEach(({ spec }) => {
+                if (!spec) return;
+                if (spec._id === bindingSpecId || spec._id === paperSpecId) return;
+                const selectedOptionLabel = formData.dynamicSpecs[spec._id];
+                if (selectedOptionLabel) {
+                    const option = spec.options.find(o => o.label === selectedOptionLabel);
+                    if (option) dynamicSpecsCost += (option.price || 0);
+                }
+            });
+        }
+
+        const totalPrice = sheetCost + coverBoxCost + dynamicSpecsCost;
+        setPriceBreakdown({ sheetCost, coverBoxCost, dynamicSpecsCost, totalPrice, bindingType, paperType });
         setCalculatedPrice(totalPrice);
     };
 
@@ -134,50 +187,145 @@ const OrderForm = () => {
 
     const validateStep = (step) => {
         switch (step) {
-            case 0: return formData.title && formData.bindingType && (formData.bindingType === 'Layflat' || formData.paperType);
+            case 0:
+                if (!formData.title.trim()) { showToast('Please enter an album title'); return false; }
+                if (product?.colors?.length > 0 && !formData.albumColor) { showToast('Please select an album color'); return false; }
+                return true;
             case 1: {
-                const hasColors = product?.colors?.length > 0;
-                return formData.size && (!hasColors || formData.albumColor) && formData.sheetCount >= 20 && formData.sheetCount <= 60;
+                const specs = product?.specifications || [];
+
+                const bindingSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('binding'));
+                const selectedBinding = bindingSpecEntry
+                    ? formData.dynamicSpecs[bindingSpecEntry.spec._id]
+                    : formData.bindingType;
+
+                if (!selectedBinding) { showToast('Please select a binding type'); return false; }
+
+                if (selectedBinding !== 'Layflat') {
+                    // Paper type required
+                    const paperSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('paper'));
+                    if (paperSpecEntry && !formData.dynamicSpecs[paperSpecEntry.spec._id]) {
+                        showToast('Please select a paper type'); return false;
+                    }
+
+                    // At least one size required
+                    const sizeSpecIds = specs
+                        .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
+                        .map(({ spec }) => spec._id);
+                    const hasSize = sizeSpecIds.some(id => formData.dynamicSpecs[id]);
+                    if (sizeSpecIds.length > 0 && !hasSize) {
+                        showToast('Please select a size'); return false;
+                    }
+                }
+
+                return true;
             }
-            case 2: {
-                if (!formData.boxType || !formData.imageLink) return false;
+            case 2:
+                if (!formData.imageLink.trim()) { showToast('Please provide an image upload link'); return false; }
+                // Validate required front page customization
                 if (product?.frontPageOptions) {
-                    for (const o of product.frontPageOptions) {
-                        if (o.required && !formData.frontPageCustomization[o.id]) return false;
+                    for (const opt of product.frontPageOptions) {
+                        if (opt.required && !formData.frontPageCustomization[opt.id]) {
+                            showToast(`Please provide ${opt.label}`);
+                            return false;
+                        }
                     }
                 }
                 return true;
-            }
-            case 3: return ['name', 'phone', 'address', 'city', 'state', 'pincode'].every(f => formData.deliveryAddress[f]);
+            case 3:
+                const { name, phone, address, city, state, pincode } = formData.deliveryAddress;
+                if (!name || !phone || !address || !city || !state || !pincode) {
+                    showToast('Please fill all delivery details');
+                    return false;
+                }
+                return true;
             default: return true;
         }
     };
 
     const nextStep = () => {
-        if (validateStep(currentStep)) { setCurrentStep(p => Math.min(p + 1, 3)); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-        else showToast('Please fill in all required fields', 'warning');
+        if (validateStep(currentStep)) { 
+            setCurrentStep(p => Math.min(p + 1, 3)); 
+            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+        }
     };
 
     const prevStep = () => { setCurrentStep(p => Math.max(p - 1, 0)); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
+    const openRazorpay = (paymentData, user) => {
+        const options = {
+            key: paymentData.keyId,
+            amount: paymentData.amount,
+            currency: paymentData.currency,
+            name: 'Zero Gravity Albums',
+            description: formData.title,
+            order_id: paymentData.razorpayOrderId,
+            prefill: {
+                name: formData.deliveryAddress.name,
+                contact: formData.deliveryAddress.phone,
+            },
+            theme: { color: '#D4AF37' },
+            handler: async (response) => {
+                try {
+                    const verifyRes = await fetch(API_ENDPOINTS.PAYMENT_VERIFY, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            dbOrderId: paymentData.dbOrderId
+                        })
+                    });
+                    if (verifyRes.ok) {
+                        showToast('Payment successful! Order placed.', 'success');
+                        setTimeout(() => navigate('/my-orders'), 1500);
+                    } else {
+                        showToast('Payment verification failed. Contact support.', 'error');
+                    }
+                } catch {
+                    showToast('Error verifying payment. Contact support.', 'error');
+                } finally {
+                    setSubmitting(false);
+                }
+            },
+            modal: {
+                ondismiss: () => {
+                    showToast('Payment cancelled. Your order is saved — retry from My Orders.', 'error');
+                    setSubmitting(false);
+                }
+            }
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', () => {
+            showToast('Payment failed. Your order is saved — retry from My Orders.', 'error');
+            setSubmitting(false);
+        });
+        rzp.open();
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!validateStep(3)) { showToast('Please fill in all required fields', 'warning'); return; }
+        if (!validateStep(3)) return;
         setSubmitting(true);
         try {
             let user = null;
             try { user = JSON.parse(localStorage.getItem('user')); } catch {}
             if (!user) { showToast('Please login to place an order', 'warning'); navigate('/login'); return; }
-            const res = await fetch(API_ENDPOINTS.ORDERS, {
+
+            const res = await fetch(API_ENDPOINTS.PAYMENT_CREATE_ORDER, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...formData, userId: user.id, productId, calculatedPrice })
             });
-            const result = await res.json();
-            if (res.ok) { showToast('Order placed successfully!', 'success'); setTimeout(() => navigate('/my-orders'), 1500); }
-            else showToast(result.message || 'Failed to place order', 'error');
-        } catch { showToast('Error placing order', 'error'); }
-        finally { setSubmitting(false); }
+            const data = await res.json();
+            if (!res.ok) { showToast(data.message || 'Failed to initiate payment', 'error'); setSubmitting(false); return; }
+
+            openRazorpay(data, user);
+        } catch {
+            showToast('Error initiating payment', 'error');
+            setSubmitting(false);
+        }
     };
 
     const SelectionCard = ({ selected, onClick, children, className = '' }) => (
@@ -197,131 +345,200 @@ const OrderForm = () => {
     const labelCls = "block text-sm font-semibold text-zg-primary mb-2";
 
     const renderStepContent = () => {
+        const labelCls = "text-sm font-bold text-zg-secondary uppercase tracking-wider mb-2 block";
+        const inputCls = "w-full px-5 py-4 rounded-xl bg-zg-bg border border-zg-secondary/20 text-zg-primary focus:outline-none focus:border-zg-accent transition-all shadow-inner placeholder:text-zg-secondary/30";
+
         switch (currentStep) {
             case 0: return (
-                <div className="space-y-8">
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
                         <label className={labelCls}>Album Title <span className="text-zg-accent">*</span></label>
                         <input type="text" name="title" value={formData.title} onChange={handleChange}
-                            placeholder="e.g., Romeo & Juliet" className={inputCls} />
+                            placeholder="e.g. Rahul & Priya's Wedding" className={inputCls} />
                     </div>
 
-                    <div>
-                        <label className={labelCls}>Binding Type <span className="text-zg-accent">*</span></label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {((product?.bindingTypes?.length > 0) ? product.bindingTypes : ['NT', 'Layflat']).map(type => (
-                                <SelectionCard key={type} selected={formData.bindingType === type}
-                                    onClick={() => setFormData(prev => ({ ...prev, bindingType: type, paperType: type === 'NT' ? (product?.paperTypes?.[0] || 'Glossy') : '' }))}>
-                                    <div className="pr-6">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <p className="font-bold">{type === 'NT' ? 'NT (Normal Type)' : 'Layflat'}</p>
-                                            {type === 'Layflat' && <span className="text-[10px] px-1.5 py-0.5 bg-zg-accent/20 text-zg-accent rounded font-bold tracking-wider">Premium</span>}
-                                        </div>
-                                        <p className="text-xs text-zg-secondary">{type === 'NT' ? 'Traditional binding with multiple paper options' : 'Premium seamless binding'}</p>
-                                    </div>
-                                </SelectionCard>
-                            ))}
-                        </div>
-                    </div>
-
-                    {formData.bindingType === 'NT' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
-                            <label className={labelCls}>Paper Type <span className="text-zg-accent">*</span></label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {((product?.paperTypes?.length > 0) ? product.paperTypes : ['Glossy', 'Matte', 'Lustre', 'Metallic']).map(type => (
-                                    <SelectionCard key={type} selected={formData.paperType === type}
-                                        onClick={() => setFormData(prev => ({ ...prev, paperType: type }))}>
-                                        <p className="font-semibold text-sm text-center w-full">{type}</p>
-                                    </SelectionCard>
-                                ))}
+                            <label className={labelCls}>Sheet Count <span className="text-zg-accent">*</span></label>
+                            <p className="text-[10px] text-zg-secondary mb-3 uppercase font-bold tracking-tighter">Min 20 - Max 60 sheets</p>
+                            <div className="flex items-center gap-6 p-4 bg-zg-bg rounded-2xl border border-zg-secondary/10">
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.max(20, p.sheetCount - 2) }))}
+                                    className="w-12 h-12 rounded-xl bg-zg-surface flex items-center justify-center hover:bg-zg-accent hover:text-black transition-all shadow-lg active:scale-95 border border-zg-secondary/5">
+                                    <Minus className="w-5 h-5" />
+                                </button>
+                                <div className="flex-1 text-center">
+                                    <span className="text-3xl font-black text-zg-accent">{formData.sheetCount}</span>
+                                    <span className="ml-2 text-zg-secondary text-xs font-bold uppercase">Sheets</span>
+                                </div>
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.min(60, p.sheetCount + 2) }))}
+                                    className="w-12 h-12 rounded-xl bg-zg-surface flex items-center justify-center hover:bg-zg-accent hover:text-black transition-all shadow-lg active:scale-95 border border-zg-secondary/5">
+                                    <Plus className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
-                    )}
+
+                        {product?.colors?.length > 0 && (
+                            <div>
+                                <label className={labelCls}>Album Color <span className="text-zg-accent">*</span></label>
+                                <p className="text-[10px] text-zg-secondary mb-3 uppercase font-bold tracking-tighter">Select from available variants</p>
+                                <div className="flex flex-wrap gap-3 p-4 bg-zg-bg rounded-2xl border border-zg-secondary/10">
+                                    {product.colors.map((color, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => setFormData(p => ({ ...p, albumColor: color.name }))}
+                                            className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center shadow-md ${formData.albumColor === color.name ? 'border-zg-accent ring-2 ring-zg-accent/20 scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                            style={{ backgroundColor: color.hex }}
+                                            title={color.name}
+                                        >
+                                            {formData.albumColor === color.name && <Check className="w-5 h-5 text-white drop-shadow" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
 
             case 1: return (
-                <div className="space-y-8">
-                    <div>
-                        <label className={labelCls}>Number of Sheets <span className="text-xs text-zg-secondary font-normal">(20–60)</span> <span className="text-zg-accent">*</span></label>
-                        <div className="flex items-center gap-4 mt-2">
-                            <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.max(20, p.sheetCount - 1) }))}
-                                className="w-11 h-11 rounded-xl bg-zg-surface border border-zg-secondary/10 hover:border-zg-accent transition-all flex items-center justify-center text-xl font-bold flex-shrink-0">−</button>
-                            <input type="number" name="sheetCount" min="20" max="60" value={formData.sheetCount} onChange={handleChange}
-                                className="flex-1 px-4 py-3 rounded-xl bg-zg-bg border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition-all text-center text-2xl font-bold" />
-                            <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.min(60, p.sheetCount + 1) }))}
-                                className="w-11 h-11 rounded-xl bg-zg-surface border border-zg-secondary/10 hover:border-zg-accent transition-all flex items-center justify-center text-xl font-bold flex-shrink-0">+</button>
-                        </div>
-                    </div>
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {[...(product?.specifications || [])].sort((a, b) => {
+                        const aIsBinding = a.spec?.label?.toLowerCase().includes('binding') ? -1 : 0;
+                        const bIsBinding = b.spec?.label?.toLowerCase().includes('binding') ? -1 : 0;
+                        return aIsBinding - bIsBinding;
+                    }).map(({ spec, enabledOptions }) => {
+                        if (!spec) return null;
 
-                    <div>
-                        <label className={labelCls}>Size & Orientation <span className="text-zg-accent">*</span></label>
-                        {['Square', 'Portrait', 'Landscape'].map(orientation => {
-                            const sizes = product?.sizes?.[orientation] || [];
-                            if (!sizes.length) return null;
-                            return (
-                                <div key={orientation} className="mb-4">
-                                    <p className="text-xs font-bold text-zg-secondary uppercase tracking-widest mb-2">{orientation}</p>
-                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                        {sizes.map(size => (
-                                            <SelectionCard key={size} selected={formData.size === size}
-                                                onClick={() => setFormData(p => ({ ...p, size }))}>
-                                                <p className="font-bold text-sm text-center w-full">{size}</p>
+                        // Determine selected binding type from dynamicSpecs
+                        const bindingSpec = (product?.specifications || []).find(
+                            ({ spec: s }) => s?.label?.toLowerCase().includes('binding')
+                        );
+                        const selectedBinding = bindingSpec
+                            ? formData.dynamicSpecs[bindingSpec.spec._id]
+                            : formData.bindingType;
+
+                        // Hide paper type and size sections when Layflat is selected
+                        const isSizeSpec = spec.label?.toLowerCase().includes('size');
+                        const isPaperSpec = spec.label?.toLowerCase().includes('paper');
+                        const isBindingSpec = spec.label?.toLowerCase().includes('binding');
+                        if (selectedBinding === 'Layflat' && (isSizeSpec || isPaperSpec)) return null;
+
+                        // Collect all size spec IDs so selecting one clears the others
+                        const allSizeSpecIds = (product?.specifications || [])
+                            .filter(({ spec: s }) => s?.label?.toLowerCase().includes('size'))
+                            .map(({ spec: s }) => s._id);
+
+                        const visibleOptions = enabledOptions?.length > 0
+                            ? enabledOptions.map(lbl => spec.options.find(o => o.label === lbl) || { label: lbl, price: 0 })
+                            : spec.options;
+                        return (
+                            <div key={spec._id} className="space-y-4">
+                                <label className={labelCls}>{spec.label}</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {visibleOptions.map((opt) => {
+                                        // Show per-sheet price for paper types (from pricing config)
+                                        const layflantPerSheet = isBindingSpec && opt.label === 'Layflat' ? pricing?.sheetTypes?.Layflat?.pricePerSheet : null;
+                                        const priceLabel = isPaperSpec && opt.price > 0 ? `₹${opt.price}/sheet` : layflantPerSheet ? `₹${layflantPerSheet}/sheet` : opt.price > 0 ? `+ ₹${opt.price}` : null;
+                                        return (
+                                            <SelectionCard
+                                                key={opt.label}
+                                                selected={formData.dynamicSpecs[spec._id] === opt.label}
+                                                onClick={() => setFormData(p => {
+                                                    const updated = { ...p.dynamicSpecs };
+                                                    // Clear all other size specs before selecting this one
+                                                    if (isSizeSpec) {
+                                                        allSizeSpecIds.forEach(id => { delete updated[id]; });
+                                                    }
+                                                    updated[spec._id] = opt.label;
+                                                    return { ...p, dynamicSpecs: updated };
+                                                })}
+                                            >
+                                                <div className="flex flex-col items-center gap-1 w-full py-1">
+                                                    <span className="font-bold text-sm text-center line-clamp-2">{opt.label}</span>
+                                                    {priceLabel && (
+                                                        <span className="text-[10px] text-zg-accent font-black bg-zg-accent/10 px-2 py-0.5 rounded">{priceLabel}</span>
+                                                    )}
+                                                </div>
                                             </SelectionCard>
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
-                    </div>
-
-                    {product?.colors?.length > 0 && (
-                        <div>
-                            <label className={labelCls}>Album Color <span className="text-zg-accent">*</span></label>
-                            <div className="flex flex-wrap gap-3 mt-2">
-                                {product.colors.map(color => (
-                                    <button key={color.name} type="button" title={color.name}
-                                        onClick={() => setFormData(p => ({ ...p, albumColor: color.name }))}
-                                        className={`w-9 h-9 rounded-full border-2 transition-all ${formData.albumColor === color.name ? 'border-zg-accent scale-110 shadow-lg shadow-zg-accent/30' : 'border-transparent hover:border-zg-secondary/30'}`}
-                                        style={{ backgroundColor: color.hex }}
-                                    >
-                                        {formData.albumColor === color.name && <CheckCircle className="w-4 h-4 text-white drop-shadow m-auto" />}
-                                    </button>
-                                ))}
                             </div>
-                            {formData.albumColor && <p className="text-xs text-zg-secondary mt-2">Selected: <span className="text-zg-primary font-medium">{formData.albumColor}</span></p>}
+                        );
+                    })}
+
+                    {(!product?.specifications || product.specifications.length === 0) && (
+                        <div className="py-20 text-center">
+                            <p className="text-zg-secondary">No additional specifications for this product.</p>
                         </div>
                     )}
                 </div>
             );
 
             case 2: return (
-                <div className="space-y-8">
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
-                        <label className={labelCls}>Box Finish <span className="text-zg-accent">*</span></label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {(product?.boxFinishes || ['Regular', 'Matte', 'Glossy']).map(type => (
-                                <SelectionCard key={type} selected={formData.boxType === type}
-                                    onClick={() => setFormData(p => ({ ...p, boxType: type }))}>
-                                    <p className="font-semibold text-sm text-center w-full">{type}</p>
-                                </SelectionCard>
-                            ))}
+                        <label className={labelCls}>Image Upload Link <span className="text-zg-accent">*</span></label>
+                        <p className="text-xs text-zg-secondary mb-3">Please provide a Google Drive, WeTransfer, or Dropbox link containing your photos.</p>
+                        <div className="relative">
+                            <input type="url" name="imageLink" value={formData.imageLink} onChange={handleChange}
+                                placeholder="https://" className={`${inputCls} pl-12`} />
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zg-secondary">
+                                <Upload className="w-5 h-5" />
+                            </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label className={labelCls}>Image Upload Link <span className="text-zg-accent">*</span></label>
-                        <p className="text-xs text-zg-secondary mb-2">WeTransfer or Google Drive link</p>
-                        <input type="url" name="imageLink" value={formData.imageLink} onChange={handleChange}
-                            placeholder="https://" className={inputCls} />
+                    {/* Company Logo — optional */}
+                    <div className="pt-8 border-t border-zg-secondary/10">
+                        <div className="mb-4">
+                            <label className={labelCls}>Company Logo <span className="text-xs font-normal text-zg-secondary normal-case tracking-normal">(optional)</span></label>
+                            <p className="text-xs text-zg-secondary mb-3">Upload your studio or company logo to be printed on the album.</p>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <div className="flex-1 relative group">
+                                <input type="file" accept="image/*"
+                                    onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (!file) return;
+                                        setUploading(true);
+                                        const fd = new FormData();
+                                        fd.append('image', file);
+                                        try {
+                                            const res = await fetch(API_ENDPOINTS.UPLOAD, { method: 'POST', body: fd });
+                                            const data = await res.json();
+                                            setFormData(p => ({ ...p, logo: data.imageUrl || data.url }));
+                                        } catch { showToast('Failed to upload logo'); }
+                                        finally { setUploading(false); }
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled={uploading} />
+                                <div className="w-full px-5 py-4 rounded-xl bg-zg-bg border-2 border-dashed border-zg-secondary/20 text-zg-secondary flex items-center justify-center gap-3 group-hover:border-zg-accent transition-all text-sm font-bold">
+                                    {uploading ? <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-zg-accent" /> : <Upload className="w-4 h-4" />}
+                                    {uploading ? 'Uploading...' : formData.logo ? 'Replace Logo' : 'Upload Logo'}
+                                </div>
+                            </div>
+                            {formData.logo && (
+                                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-zg-accent/20 shrink-0 relative group shadow-lg">
+                                    <img src={getImageUrl(formData.logo)} alt="Logo" className="w-full h-full object-contain bg-white p-1" />
+                                    <button type="button" onClick={() => setFormData(p => ({ ...p, logo: '' }))}
+                                        className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <XCircle className="w-6 h-6 text-white" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {product?.frontPageOptions?.length > 0 && (
-                        <div className="pt-6 border-t border-zg-secondary/10">
-                            <h3 className="text-base font-bold mb-5">Front Page Customisation</h3>
-                            <div className="space-y-5">
+                        <div className="pt-8 border-t border-zg-secondary/10">
+                            <div className="mb-6">
+                                <h3 className="text-xl font-heading font-bold text-zg-primary">Front Page Customisation</h3>
+                                <p className="text-sm text-zg-secondary">Provide details to be printed on the album cover.</p>
+                            </div>
+                            <div className="space-y-6">
                                 {product.frontPageOptions.map(option => (
-                                    <div key={option.id}>
+                                    <div key={option.id} className="space-y-3">
                                         <label className={labelCls}>{option.label} {option.required && <span className="text-zg-accent">*</span>}</label>
                                         {option.type === 'text' && (
                                             <input type="text" value={formData.frontPageCustomization[option.id] || ''} onChange={e => handleCustomizationChange(option.id, e.target.value)}
@@ -331,21 +548,25 @@ const OrderForm = () => {
                                             <input type="date" value={formData.frontPageCustomization[option.id] || ''} onChange={e => handleCustomizationChange(option.id, e.target.value)} className={inputCls} />
                                         )}
                                         {option.type === 'image' && (
-                                            <div className="flex gap-3 items-center">
+                                            <div className="flex gap-4 items-center">
                                                 <div className="flex-1 relative group">
                                                     <input type="file" accept="image/*" onChange={e => handleDynamicCoverImageUpload(option.id, e)}
                                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled={uploading} />
-                                                    <div className="w-full px-4 py-3 rounded-xl bg-zg-bg border-2 border-dashed border-zg-secondary/20 text-zg-secondary flex items-center justify-center gap-2 group-hover:border-zg-accent transition-all text-sm">
-                                                        <Upload className="w-4 h-4" />
-                                                        {uploading ? 'Uploading...' : formData.frontPageCustomization[option.id] ? 'Change Image' : 'Upload Image'}
+                                                    <div className="w-full px-5 py-4 rounded-xl bg-zg-bg border-2 border-dashed border-zg-secondary/20 text-zg-secondary flex items-center justify-center gap-3 group-hover:border-zg-accent transition-all text-sm font-bold">
+                                                        {uploading ? (
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-zg-accent" />
+                                                        ) : (
+                                                            <Upload className="w-4 h-4" />
+                                                        )}
+                                                        {uploading ? 'Uploading...' : formData.frontPageCustomization[option.id] ? 'Replace Image' : 'Upload Artwork'}
                                                     </div>
                                                 </div>
                                                 {formData.frontPageCustomization[option.id] && (
-                                                    <div className="w-14 h-14 rounded-xl overflow-hidden border border-zg-secondary/10 flex-shrink-0 relative group">
+                                                    <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-zg-accent/20 flex-shrink-0 relative group shadow-lg">
                                                         <img src={getImageUrl(formData.frontPageCustomization[option.id])} alt="" className="w-full h-full object-cover" />
                                                         <button type="button" onClick={() => handleCustomizationChange(option.id, '')}
                                                             className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <XCircle className="w-5 h-5 text-white" />
+                                                            <XCircle className="w-6 h-6 text-white" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -408,8 +629,8 @@ const OrderForm = () => {
     return (
         <div className="min-h-screen bg-zg-bg text-zg-primary flex">
 
-            {/* ── Left Sidebar ── */}
-            <aside className="hidden lg:flex flex-col w-80 xl:w-96 flex-shrink-0 bg-zg-surface border-r border-zg-secondary/10 sticky top-0 h-screen overflow-y-auto">
+            {/* ── Right Sidebar ── */}
+            <aside className="hidden lg:flex flex-col w-80 xl:w-96 flex-shrink-0 bg-zg-surface border-l border-zg-secondary/10 sticky top-0 h-screen overflow-y-auto order-last">
                 <div className="p-8 flex flex-col h-full">
                     {/* Back */}
                     <button onClick={() => navigate(-1)}
@@ -469,13 +690,22 @@ const OrderForm = () => {
                                 <span className="font-medium text-zg-primary">Included</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-zg-secondary">{formData.sheetCount} Sheets ({formData.bindingType})</span>
+                                <span className="text-zg-secondary">
+                                    {formData.sheetCount} Sheets ({priceBreakdown.bindingType || formData.bindingType}
+                                    {priceBreakdown.bindingType !== 'Layflat' && priceBreakdown.paperType ? ` · ${priceBreakdown.paperType}` : ''})
+                                </span>
                                 <span className="font-medium text-zg-primary">₹{priceBreakdown.sheetCost.toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-zg-secondary">Box & Cover</span>
                                 <span className="font-medium text-zg-primary">₹{priceBreakdown.coverBoxCost.toLocaleString('en-IN')}</span>
                             </div>
+                            {priceBreakdown.dynamicSpecsCost > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zg-secondary">Add-ons / Options</span>
+                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.dynamicSpecsCost.toLocaleString('en-IN')}</span>
+                                </div>
+                            )}
                             <div className="pt-3 border-t border-zg-secondary/10 flex justify-between items-center">
                                 <span className="font-bold">Total</span>
                                 <span className="text-2xl font-black text-zg-accent">₹{priceBreakdown.totalPrice.toLocaleString('en-IN')}</span>
@@ -524,7 +754,7 @@ const OrderForm = () => {
                             <p className="text-xs text-zg-secondary">Total</p>
                             <p className="text-xl font-black text-zg-accent">₹{priceBreakdown.totalPrice.toLocaleString('en-IN')}</p>
                         </div>
-                        <p className="text-xs text-zg-secondary">{formData.sheetCount} sheets · {formData.bindingType}</p>
+                        <p className="text-xs text-zg-secondary">{formData.sheetCount} sheets · {priceBreakdown.bindingType || formData.bindingType}{priceBreakdown.bindingType !== 'Layflat' && priceBreakdown.paperType ? ` · ${priceBreakdown.paperType}` : ''}</p>
                     </div>
 
                     {/* Navigation */}
@@ -537,7 +767,7 @@ const OrderForm = () => {
                         {currentStep === steps.length - 1 ? (
                             <button onClick={handleSubmit} disabled={submitting}
                                 className="flex items-center gap-2 px-8 py-3.5 bg-zg-accent text-black font-bold rounded-xl hover:bg-zg-accent-hover transition-all shadow-lg shadow-zg-accent/20 disabled:opacity-50 text-sm uppercase tracking-wide">
-                                {submitting ? 'Placing Order...' : <><CheckCircle2 className="w-5 h-5" /> Place Order</>}
+                                {submitting ? 'Processing...' : <><CheckCircle2 className="w-5 h-5" /> Pay & Place Order</>}
                             </button>
                         ) : (
                             <button type="button" onClick={nextStep}

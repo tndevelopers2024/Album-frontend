@@ -241,6 +241,28 @@ const OrderPrintTemplate = ({ order }) => {
                     </tbody>
                 </table>
 
+                {/* Dynamic Specifications */}
+                {order.dynamicSpecs && Object.keys(order.dynamicSpecs).length > 0 && (
+                    <div style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
+                        <table className="main-spec-table" style={{ border: 'none' }}>
+                            <thead>
+                                <tr>
+                                    {Object.keys(order.dynamicSpecs).map(key => (
+                                        <th key={key} style={{ textTransform: 'uppercase' }}>{key.replace(/_/g, ' ')}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {Object.values(order.dynamicSpecs).map((value, i) => (
+                                        <td key={i} className="value">{value}</td>
+                                    ))}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
                 {/* Job Done Details */}
                 <div className="job-done-header">Job Done Details</div>
                 <table className="job-done-table">

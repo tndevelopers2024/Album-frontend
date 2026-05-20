@@ -33,27 +33,37 @@ const Dashboard = () => {
         }
 
         const fetchData = async () => {
+            if (!storedUser || !storedUser.id) {
+                setLoading(false);
+                return;
+            }
             try {
                 // Fetch Profile
                 const profileRes = await fetch(API_ENDPOINTS.PROFILE(storedUser.id));
-                const profileData = await profileRes.json();
-                setUser(profileData);
-                setEditForm({
-                    name: profileData.name,
-                    phone: profileData.phone,
-                    businessName: profileData.businessName,
-                    gstNo: profileData.gstNo
-                });
+                if (profileRes.ok) {
+                    const profileData = await profileRes.json();
+                    setUser(profileData);
+                    setEditForm({
+                        name: profileData.name,
+                        phone: profileData.phone,
+                        businessName: profileData.businessName,
+                        gstNo: profileData.gstNo
+                    });
+                }
 
                 // Fetch Orders
                 const ordersRes = await fetch(API_ENDPOINTS.MY_ORDERS(storedUser.id));
-                const ordersData = await ordersRes.json();
-                setOrders(ordersData);
+                if (ordersRes.ok) {
+                    const ordersData = await ordersRes.json();
+                    setOrders(ordersData);
+                }
 
                 // Fetch Favorites
                 const favsRes = await fetch(API_ENDPOINTS.FAVORITES(storedUser.id));
-                const favsData = await favsRes.json();
-                setFavorites(favsData);
+                if (favsRes.ok) {
+                    const favsData = await favsRes.json();
+                    setFavorites(favsData);
+                }
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
             } finally {

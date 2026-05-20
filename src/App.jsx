@@ -28,6 +28,8 @@ import AdminOrders from './pages/AdminOrders';
 import AdminOrderDetails from './pages/AdminOrderDetails';
 import AdminReports from './pages/AdminReports';
 import AdminSettings from './pages/AdminSettings';
+import AdminMasterSpecs from './pages/AdminMasterSpecs';
+import AdminPayments from './pages/AdminPayments';
 import Dashboard from './pages/Dashboard';
 import MainLayout from './components/layouts/MainLayout';
 import { ThemeProvider } from './context/ThemeContext';
@@ -48,18 +50,22 @@ function App() {
               <Route path="/terms" element={<TermsAndConditions />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/shop/:productId" element={<ProductDetails />} />
-              <Route path="/shop/:productId/customize" element={<OrderForm />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/my-orders" element={<MyOrders />} />
               <Route path="/contact" element={<Contact />} />
             </Route>
 
+            {/* Standalone routes — no navbar/footer */}
+            <Route path="/shop/:productId/customize" element={<OrderForm />} />
+
             {/* Admin Routes */}
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/payments" element={<AdminPayments />} />
             <Route path="/admin/orders/:orderId" element={<AdminOrderDetails />} />
             <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/master-specs" element={<AdminMasterSpecs />} />
             <Route path="/admin/users" element={<UsersList />} />
             <Route path="/admin/users/:id" element={<UserDetails />} />
             <Route path="/admin/products" element={<ProductsList />} />

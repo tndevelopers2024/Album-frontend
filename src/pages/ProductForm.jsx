@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
-import { ArrowLeft, Save, Upload, X, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, Image as ImageIcon, Plus, Trash2, Settings2 } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 
@@ -29,7 +29,8 @@ const ProductForm = () => {
         paperTypes: [],
         bindingTypes: [],
         boxFinishes: [],
-        colors: []
+        colors: [],
+        specifications: []  // [{ spec: ObjectId, enabledOptions: [String] }]
     });
     const [loading, setLoading] = useState(false);
     const [suggestions, setSuggestions] = useState({
@@ -37,7 +38,8 @@ const ProductForm = () => {
         paperTypes: [],
         bindingTypes: [],
         boxFinishes: [],
-        sizes: { Square: [], Portrait: [], Landscape: [] }
+        sizes: { Square: [], Portrait: [], Landscape: [] },
+        masterSpecs: []
     });
 
     // Store file objects for deferred upload
@@ -58,22 +60,25 @@ const ProductForm = () => {
             const products = await response.json();
             
             const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
-            const papers = [...new Set(products.flatMap(p => p.paperTypes || []).filter(Boolean))];
-            const bindings = [...new Set(products.flatMap(p => p.bindingTypes || []).filter(Boolean))];
-            const finishes = [...new Set(products.flatMap(p => p.boxFinishes || []).filter(Boolean))];
+            
+            // Fetch Master Specs
+            const masterSpecsRes = await fetch(API_ENDPOINTS.MASTER_SPECS);
+            const masterSpecs = await masterSpecsRes.json();
+
+            // Sync core suggestions from Master Specs
+            const findSpecOptions = (name) => masterSpecs.find(s => s.name === name)?.options.map(o => o.label) || [];
+            
+            const papers = [...new Set([...findSpecOptions('paper_types'), ...products.flatMap(p => p.paperTypes || [])])].filter(Boolean);
+            const bindings = [...new Set([...findSpecOptions('binding_types'), ...products.flatMap(p => p.bindingTypes || [])])].filter(Boolean);
+            const finishes = [...new Set([...findSpecOptions('box_finishes'), ...products.flatMap(p => p.boxFinishes || [])])].filter(Boolean);
             
             const sizes = {
-                Square: [...new Set(products.flatMap(p => p.sizes?.Square || []).filter(Boolean))],
-                Portrait: [...new Set(products.flatMap(p => p.sizes?.Portrait || []).filter(Boolean))],
-                Landscape: [...new Set(products.flatMap(p => p.sizes?.Landscape || []).filter(Boolean))]
+                Square: [...new Set([...findSpecOptions('square_sizes'), ...products.flatMap(p => p.sizes?.Square || [])])].filter(Boolean),
+                Portrait: [...new Set([...findSpecOptions('portrait_sizes'), ...products.flatMap(p => p.sizes?.Portrait || [])])].filter(Boolean),
+                Landscape: [...new Set([...findSpecOptions('landscape_sizes'), ...products.flatMap(p => p.sizes?.Landscape || [])])].filter(Boolean)
             };
-
-            // Add global defaults if they are empty
-            if (papers.length === 0) papers.push('Glossy', 'Matte', 'Lustre', 'Metallic', 'Fine Art', 'Canvas');
-            if (bindings.length === 0) bindings.push('NT', 'Layflat');
-            if (finishes.length === 0) finishes.push('Regular', 'Matte', 'Glossy');
-
-            setSuggestions({ categories: cats, paperTypes: papers, bindingTypes: bindings, boxFinishes: finishes, sizes });
+            
+            setSuggestions({ categories: cats, paperTypes: papers, bindingTypes: bindings, boxFinishes: finishes, sizes, masterSpecs });
         } catch (error) {
             console.error('Error fetching suggestions:', error);
         }
@@ -102,7 +107,11 @@ const ProductForm = () => {
                 paperTypes: data.paperTypes || [],
                 bindingTypes: data.bindingTypes || [],
                 boxFinishes: data.boxFinishes || [],
-                colors: data.colors || []
+                colors: data.colors || [],
+                specifications: data.specifications?.map(s => ({
+                    spec: s.spec?._id || s.spec || s._id || s,
+                    enabledOptions: s.enabledOptions || []
+                })).filter(s => s.spec) || []
             });
         } catch (error) {
             console.error('Error fetching product:', error);
@@ -298,6 +307,30 @@ const ProductForm = () => {
         setFormData(prev => ({ ...prev, colors: newColors }));
     };
 
+    const isSpecSelected = (specId) => formData.specifications.some(s => s.spec === specId);
+    const getEnabledOptions = (specId) => formData.specifications.find(s => s.spec === specId)?.enabledOptions || [];
+
+    const toggleSpec = (specId, masterOptions) => {
+        const selected = isSpecSelected(specId);
+        setFormData(prev => ({
+            ...prev,
+            specifications: selected
+                ? prev.specifications.filter(s => s.spec !== specId)
+                : [...prev.specifications, { spec: specId, enabledOptions: masterOptions.map(o => o.label) }]
+        }));
+    };
+
+    const toggleOption = (specId, optionLabel) => {
+        setFormData(prev => ({
+            ...prev,
+            specifications: prev.specifications.map(s => {
+                if (s.spec !== specId) return s;
+                const has = s.enabledOptions.includes(optionLabel);
+                return { ...s, enabledOptions: has ? s.enabledOptions.filter(o => o !== optionLabel) : [...s.enabledOptions, optionLabel] };
+            })
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -475,11 +508,10 @@ const ProductForm = () => {
 
                             {/* Price */}
                             <div>
-                                <label className="text-zg-secondary text-sm mb-2 block">Price *</label>
+                                <label className="text-zg-secondary text-sm mb-2 block">Price</label>
                                 <input
                                     type="number"
                                     name="price"
-                                    required
                                     value={formData.price}
                                     onChange={handleChange}
                                     placeholder="Enter price"
@@ -489,11 +521,10 @@ const ProductForm = () => {
 
                             {/* Box/PAD Price */}
                             <div>
-                                <label className="text-zg-secondary text-sm mb-2 block">Box/PAD Price *</label>
+                                <label className="text-zg-secondary text-sm mb-2 block">Box/PAD Price</label>
                                 <input
                                     type="number"
                                     name="boxPrice"
-                                    required
                                     value={formData.boxPrice}
                                     onChange={handleChange}
                                     placeholder="Enter box price"
@@ -594,18 +625,6 @@ const ProductForm = () => {
                                         )}
                                     </div>
 
-                                    {/* URL Option */}
-                                    <div className="relative">
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zg-secondary text-xs">OR</div>
-                                        <input
-                                            type="url"
-                                            name="image"
-                                            value={formData.image}
-                                            onChange={handleChange}
-                                            placeholder="Paste image URL here"
-                                            className="w-full pl-12 pr-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition placeholder:text-zg-secondary/30"
-                                        />
-                                    </div>
                                 </div>
                             </div>
 
@@ -627,33 +646,6 @@ const ProductForm = () => {
                                             <span className="font-medium">Click to upload gallery images</span>
                                             <span className="text-xs opacity-50">Supports multiple files</span>
                                         </div>
-                                    </div>
-
-                                    {/* URL Option */}
-                                    <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zg-secondary text-xs">OR</div>
-                                            <input
-                                                type="url"
-                                                id="galleryUrlInput"
-                                                placeholder="Paste image URL and click Add"
-                                                className="w-full pl-12 pr-4 py-3 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent focus:ring-1 focus:ring-zg-accent transition placeholder:text-zg-secondary/30"
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const input = document.getElementById('galleryUrlInput');
-                                                const url = input.value.trim();
-                                                if (url) {
-                                                    setFormData(prev => ({ ...prev, gallery: [...prev.gallery, url] }));
-                                                    input.value = '';
-                                                }
-                                            }}
-                                            className="px-6 py-3 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors font-medium whitespace-nowrap"
-                                        >
-                                            Add URL
-                                        </button>
                                     </div>
 
                                     {/* Gallery Grid */}
@@ -678,168 +670,126 @@ const ProductForm = () => {
                     </div>
                 </div>
 
-                    {/* Product Specifications Section */}
+                    {/* Dynamic Specifications Section */}
                     <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">
-                        <h2 className="text-xl font-heading font-bold">Product Specifications</h2>
-                        
-                        <div className="space-y-6">
-                            {/* Paper Types */}
-                            <div className="space-y-3">
-                                <label className="text-zg-secondary text-sm block uppercase tracking-wider">Paper Types (NT Binding Only)</label>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {formData.paperTypes.map(tag => (
-                                        <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-zg-accent/10 text-zg-accent rounded-lg text-sm border border-zg-accent/20">
-                                            {tag}
-                                            <button type="button" onClick={() => removeTag('paperTypes', tag)} className="hover:text-white transition-colors">
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        id="newPaperType"
-                                        list="paper-suggestions"
-                                        placeholder="Add paper type (e.g. Glossy)"
-                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('paperTypes', e.target.value); e.target.value = ''; } }}
-                                        className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
-                                    />
-                                    <datalist id="paper-suggestions">
-                                        {suggestions.paperTypes.map(tag => (
-                                            <option key={tag} value={tag} />
-                                        ))}
-                                    </datalist>
-                                    <button 
-                                        type="button"
-                                        onClick={() => { const input = document.getElementById('newPaperType'); addTag('paperTypes', input.value); input.value = ''; }}
-                                        className="px-4 py-2.5 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors font-medium text-sm"
-                                    >
-                                        Add
-                                    </button>
-                                </div>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-heading font-bold">Product Specifications</h2>
+                                <p className="text-sm text-zg-secondary">Select fields and choose which options apply to this product.</p>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Binding Types */}
-                                <div className="space-y-3">
-                                    <label className="text-zg-secondary text-sm block uppercase tracking-wider">Binding Types</label>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {formData.bindingTypes.map(tag => (
-                                            <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-sm border border-purple-500/20">
-                                                {tag}
-                                                <button type="button" onClick={() => removeTag('bindingTypes', tag)} className="hover:text-white transition-colors">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            id="newBindingType"
-                                            list="binding-suggestions"
-                                            placeholder="e.g. NT, Layflat"
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('bindingTypes', e.target.value); e.target.value = ''; } }}
-                                            className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
-                                        />
-                                        <datalist id="binding-suggestions">
-                                            {suggestions.bindingTypes.map(tag => (
-                                                <option key={tag} value={tag} />
-                                            ))}
-                                        </datalist>
-                                        <button 
-                                            type="button"
-                                            onClick={() => { const input = document.getElementById('newBindingType'); addTag('bindingTypes', input.value); input.value = ''; }}
-                                            className="px-4 py-2.5 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 transition-colors font-medium text-sm"
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Box Finishes */}
-                                <div className="space-y-3">
-                                    <label className="text-zg-secondary text-sm block uppercase tracking-wider">Box Finishes</label>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {formData.boxFinishes.map(tag => (
-                                            <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-lg text-sm border border-blue-500/20">
-                                                {tag}
-                                                <button type="button" onClick={() => removeTag('boxFinishes', tag)} className="hover:text-white transition-colors">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            id="newBoxFinish"
-                                            list="box-suggestions"
-                                            placeholder="e.g. Matte, Glossy"
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('boxFinishes', e.target.value); e.target.value = ''; } }}
-                                            className="flex-1 px-4 py-2.5 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition"
-                                        />
-                                        <datalist id="box-suggestions">
-                                            {suggestions.boxFinishes.map(tag => (
-                                                <option key={tag} value={tag} />
-                                            ))}
-                                        </datalist>
-                                        <button 
-                                            type="button"
-                                            onClick={() => { const input = document.getElementById('newBoxFinish'); addTag('boxFinishes', input.value); input.value = ''; }}
-                                            className="px-4 py-2.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors font-medium text-sm"
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sizes */}
-                            <div className="space-y-4 pt-4 border-t border-zg-secondary/10">
-                                <label className="text-zg-secondary text-sm block uppercase tracking-wider">Size Options</label>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {['Square', 'Portrait', 'Landscape'].map((orientation) => (
-                                        <div key={orientation} className="space-y-3">
-                                            <label className="text-zg-primary text-xs font-bold uppercase tracking-widest">{orientation}</label>
-                                            <div className="flex flex-wrap gap-2 min-h-[40px] p-2 rounded-lg bg-zg-bg/50 border border-zg-secondary/5">
-                                                {formData.sizes[orientation].map(tag => (
-                                                    <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-zg-surface text-zg-primary rounded-md text-xs border border-zg-secondary/10 shadow-sm">
-                                                        {tag}
-                                                        <button type="button" onClick={() => removeSizeTag(orientation, tag)} className="hover:text-red-400 transition-colors">
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                            <div className="flex gap-1.5">
-                                                <input
-                                                    type="text"
-                                                    id={`newSize-${orientation}`}
-                                                    list={`size-suggestions-${orientation}`}
-                                                    placeholder="Add size"
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSizeTag(orientation, e.target.value); e.target.value = ''; } }}
-                                                    className="flex-1 px-3 py-2 rounded-lg bg-zg-surface border border-zg-secondary/10 text-zg-primary focus:outline-none focus:border-zg-accent transition text-xs"
-                                                />
-                                                <datalist id={`size-suggestions-${orientation}`}>
-                                                    {(suggestions.sizes[orientation] || []).map(tag => (
-                                                        <option key={tag} value={tag} />
-                                                    ))}
-                                                </datalist>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => { const input = document.getElementById(`newSize-${orientation}`); addSizeTag(orientation, input.value); input.value = ''; }}
-                                                    className="px-3 py-2 bg-zg-accent/10 text-zg-accent rounded-lg hover:bg-zg-accent/20 transition-colors font-medium text-xs"
-                                                >
-                                                    Add
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/admin/master-specs')}
+                                className="text-zg-accent text-sm font-bold flex items-center gap-1 hover:underline"
+                            >
+                                <Settings2 size={16} /> Manage Fields
+                            </button>
                         </div>
+
+                        {suggestions.masterSpecs.length === 0 ? (
+                            <p className="text-sm text-zg-secondary/60 italic">No specification fields created yet. <button type="button" onClick={() => navigate('/admin/master-specs')} className="text-zg-accent hover:underline">Create one</button></p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {suggestions.masterSpecs.map(spec => {
+                                    const isSelected = isSpecSelected(spec._id);
+                                    const enabledOptions = getEnabledOptions(spec._id);
+                                    return (
+                                        <div
+                                            key={spec._id}
+                                            className={`rounded-xl border transition-all flex flex-col ${
+                                                isSelected
+                                                    ? 'bg-zg-accent/5 border-zg-accent'
+                                                    : 'bg-zg-surface border-zg-secondary/10 hover:border-zg-secondary/30'
+                                            }`}
+                                        >
+                                            {/* Header row — click to toggle spec on/off */}
+                                            <div
+                                                className="p-4 cursor-pointer flex justify-between items-center"
+                                                onClick={() => toggleSpec(spec._id, spec.options)}
+                                            >
+                                                <span className="font-bold text-sm">{spec.label}</span>
+                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                                    isSelected ? 'bg-zg-accent border-zg-accent text-black' : 'border-zg-secondary/20'
+                                                }`}>
+                                                    {isSelected && <Save size={12} />}
+                                                </div>
+                                            </div>
+
+                                            {/* Option checkboxes + custom input — only when spec is selected */}
+                                            {isSelected && (
+                                                <div className="px-4 pb-4 border-t border-zg-secondary/10 pt-3 space-y-3">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {/* Master spec options */}
+                                                        {spec.options.map(opt => {
+                                                            const isOptOn = enabledOptions.includes(opt.label);
+                                                            return (
+                                                                <button
+                                                                    key={opt.label}
+                                                                    type="button"
+                                                                    onClick={() => toggleOption(spec._id, opt.label)}
+                                                                    className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-all ${
+                                                                        isOptOn
+                                                                            ? 'bg-zg-accent text-black border-zg-accent'
+                                                                            : 'bg-zg-bg text-zg-secondary border-zg-secondary/20 hover:border-zg-secondary/50'
+                                                                    }`}
+                                                                >
+                                                                    {opt.label}
+                                                                    {opt.price > 0 && <span className="ml-1 opacity-70">+₹{opt.price}</span>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                        {/* Custom options added for this product */}
+                                                        {enabledOptions.filter(lbl => !spec.options.find(o => o.label === lbl)).map(lbl => (
+                                                            <button
+                                                                key={lbl}
+                                                                type="button"
+                                                                onClick={() => toggleOption(spec._id, lbl)}
+                                                                className="text-xs px-2.5 py-1 rounded-lg border font-bold bg-zg-accent text-black border-zg-accent flex items-center gap-1"
+                                                            >
+                                                                {lbl}
+                                                                <X size={10} />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {/* Add custom value input */}
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Add custom value..."
+                                                            className="flex-1 text-xs bg-zg-bg border border-zg-secondary/20 rounded-lg px-3 py-1.5 focus:border-zg-accent outline-none transition-all"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    const val = e.target.value.trim();
+                                                                    if (val && !enabledOptions.includes(val)) {
+                                                                        toggleOption(spec._id, val);
+                                                                    }
+                                                                    e.target.value = '';
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                const input = e.currentTarget.previousSibling;
+                                                                const val = input.value.trim();
+                                                                if (val && !enabledOptions.includes(val)) {
+                                                                    toggleOption(spec._id, val);
+                                                                }
+                                                                input.value = '';
+                                                            }}
+                                                            className="text-xs px-3 py-1.5 bg-zg-secondary/10 hover:bg-zg-accent hover:text-black rounded-lg font-bold transition-all flex items-center gap-1"
+                                                        >
+                                                            <Plus size={12} /> Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Product Colors Section */}
@@ -943,6 +893,7 @@ const ProductForm = () => {
                             )}
                         </div>
                     </div>
+
 
                     {/* Front Page Customization Section */}
                     <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6 space-y-6">

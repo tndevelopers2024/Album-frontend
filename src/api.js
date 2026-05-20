@@ -34,6 +34,15 @@ export const API_ENDPOINTS = {
 
     // Album Pricing
     ALBUM_PRICING: buildUrl('/album/pricing'),
+
+    // Master Specs
+    MASTER_SPECS: buildUrl('/master-specs'),
+    MASTER_SPEC_BY_ID: (id) => buildUrl(`/master-specs/${id}`),
+
+    // Payments
+    PAYMENT_CREATE_ORDER: buildUrl('/payments/create-order'),
+    PAYMENT_VERIFY: buildUrl('/payments/verify'),
+    PAYMENT_RETRY: (orderId) => buildUrl(`/payments/retry/${orderId}`),
 };
 
 // Export base URLs

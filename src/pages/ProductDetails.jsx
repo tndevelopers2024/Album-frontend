@@ -23,7 +23,7 @@ const ProductDetails = () => {
             const user = JSON.parse(localStorage.getItem('user'));
             const [productRes, favsRes] = await Promise.all([
                 fetch(API_ENDPOINTS.PRODUCT_BY_ID(productId)),
-                user ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ json: () => [] })
+                (user && user.id) ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ ok: true, json: () => [] })
             ]);
 
             const data = await productRes.json();
@@ -237,6 +237,16 @@ const ProductDetails = () => {
                             )}
                         </button>
                         <button
+                            onClick={() => setActiveTab('specifications')}
+                            className={`pb-4 text-lg font-bold transition-colors relative ${activeTab === 'specifications' ? 'text-zg-accent' : 'text-zg-secondary hover:text-zg-primary'
+                                }`}
+                        >
+                            Specifications
+                            {activeTab === 'specifications' && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-zg-accent"></div>
+                            )}
+                        </button>
+                        <button
                             onClick={() => setActiveTab('benefits')}
                             className={`pb-4 text-lg font-bold transition-colors relative ${activeTab === 'benefits' ? 'text-zg-accent' : 'text-zg-secondary hover:text-zg-primary'
                                 }`}
@@ -259,6 +269,31 @@ const ProductDetails = () => {
                             ) : (
                                 <p>No features listed.</p>
                             )
+                        ) : activeTab === 'specifications' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {(product?.specifications || []).map(({ spec, enabledOptions }) => {
+                                    if (!spec) return null;
+                                    const visibleOptions = enabledOptions?.length > 0
+                                        ? enabledOptions.map(lbl => spec.options.find(o => o.label === lbl) || { label: lbl, price: 0 })
+                                        : spec.options;
+                                    return (
+                                        <div key={spec._id} className="flex flex-col gap-2">
+                                            <span className="text-xs font-bold text-zg-secondary uppercase">{spec.label}</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                {visibleOptions.map((opt, i) => (
+                                                    <span key={i} className="text-sm text-zg-primary bg-zg-surface px-2 py-1 rounded border border-zg-secondary/5">
+                                                        {opt.label}
+                                                        {opt.price > 0 && <span className="ml-1 text-[10px] text-zg-accent font-bold">+₹{opt.price}</span>}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {(!product?.specifications || product.specifications.length === 0) && (
+                                    <p className="col-span-full py-10 text-center">Standard product specifications apply.</p>
+                                )}
+                            </div>
                         ) : (
                             product.benefits && product.benefits.length > 0 ? (
                                 <ul className="list-disc list-inside space-y-2">

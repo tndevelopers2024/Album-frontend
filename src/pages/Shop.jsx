@@ -41,7 +41,7 @@ const Shop = () => {
             try {
                 const [productsRes, favsRes] = await Promise.all([
                     fetch(API_ENDPOINTS.PRODUCTS),
-                    user ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ json: () => [] })
+                    (user && user.id) ? fetch(API_ENDPOINTS.FAVORITES(user.id)) : Promise.resolve({ ok: true, json: () => [] })
                 ]);
                 
                 const productsData = await productsRes.json();
@@ -324,13 +324,11 @@ const Shop = () => {
                                     >
                                         <Heart className={`w-4 h-4 ${favorites.includes(product._id) ? 'fill-current' : ''}`} />
                                     </button>
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                                        <span className="inline-flex items-center gap-2 text-white font-bold text-sm">
-                                            View Details <ArrowRight className="w-4 h-4" />
-                                        </span>
-                                    </div>
                                 </div>
                                 <div className="p-6">
+                                    {product.category && (
+                                        <p className="text-xs uppercase tracking-widest text-zg-accent font-bold mb-2">{product.category}</p>
+                                    )}
                                     <h3 className="text-lg font-heading font-bold mb-2 group-hover:text-zg-accent transition-colors">
                                         {product.name}
                                     </h3>

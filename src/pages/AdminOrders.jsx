@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
 import { Search, Filter, Eye, MoreVertical, CheckCircle, XCircle, Clock, Package } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 
 const AdminOrders = () => {
+    const navigate = useNavigate();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -101,12 +103,13 @@ const AdminOrders = () => {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zg-secondary uppercase tracking-wider">Product</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zg-secondary uppercase tracking-wider">Date</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zg-secondary uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-zg-secondary uppercase tracking-wider">Payment</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-zg-secondary uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zg-secondary/10">
                             {filteredOrders.map((order) => (
-                                <tr key={order._id} className="hover:bg-zg-secondary/5 transition-colors">
+                                <tr key={order._id} onClick={() => navigate(`/admin/orders/${order._id}`)} className="hover:bg-zg-secondary/5 transition-colors cursor-pointer">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zg-primary">
                                         #{order._id.slice(-6).toUpperCase()}
                                     </td>
@@ -141,9 +144,17 @@ const AdminOrders = () => {
                                             {order.status}
                                         </span>
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-500' :
+                                            order.paymentStatus === 'failed' ? 'bg-red-500/10 text-red-500' :
+                                                'bg-yellow-500/10 text-yellow-500'
+                                            }`}>
+                                            {order.paymentStatus === 'paid' ? 'Paid' : order.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
+                                        </span>
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button
-                                            onClick={() => window.location.href = `/admin/orders/${order._id}`}
+                                            onClick={e => { e.stopPropagation(); navigate(`/admin/orders/${order._id}`); }}
                                             className="text-zg-secondary hover:text-zg-primary transition-colors"
                                         >
                                             <Eye className="w-4 h-4" />

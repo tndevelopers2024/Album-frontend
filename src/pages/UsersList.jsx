@@ -299,7 +299,8 @@ const UsersList = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.02 }}
-                            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-zg-secondary/10 transition-all duration-200 group"
+                            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-zg-secondary/10 transition-all duration-200 group cursor-pointer"
+                            onClick={() => navigate(`/admin/users/${user._id}`)}
                         >
                             {/* User Info */}
                             <div className="col-span-3 flex items-center gap-3">
@@ -358,14 +359,14 @@ const UsersList = () => {
                                 {user.status === 'pending' ? (
                                     <>
                                         <button
-                                            onClick={() => openConfirmModal(user._id, 'approve', user.name)}
+                                            onClick={e => { e.stopPropagation(); openConfirmModal(user._id, 'approve', user.name); }}
                                             className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg transition-all border border-green-500/20"
                                             title="Approve"
                                         >
                                             <CheckCircle className="w-4 h-4" />
                                         </button>
                                         <button
-                                            onClick={() => openConfirmModal(user._id, 'reject', user.name)}
+                                            onClick={e => { e.stopPropagation(); openConfirmModal(user._id, 'reject', user.name); }}
                                             className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
                                             title="Reject"
                                         >
@@ -374,7 +375,7 @@ const UsersList = () => {
                                     </>
                                 ) : (
                                     <button
-                                        onClick={() => navigate(`/admin/users/${user._id}`)}
+                                        onClick={e => { e.stopPropagation(); navigate(`/admin/users/${user._id}`); }}
                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-zg-accent/10 hover:bg-zg-accent/20 text-zg-accent rounded-lg transition-all border border-zg-accent/20 text-xs font-medium"
                                     >
                                         <Eye className="w-3.5 h-3.5" />
@@ -382,7 +383,7 @@ const UsersList = () => {
                                     </button>
                                 )}
                                 <button
-                                    onClick={() => openConfirmModal(user._id, 'delete', user.name)}
+                                    onClick={e => { e.stopPropagation(); openConfirmModal(user._id, 'delete', user.name); }}
                                     className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
                                     title="Delete User"
                                 >

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layouts/DashboardLayout';
-import { ArrowLeft, Package, Calendar, User, Mail, FileText, Box, Layers, BookOpen, Image as ImageIcon, MapPin, Phone, Printer } from 'lucide-react';
+import { ArrowLeft, Package, Calendar, User, Mail, FileText, Box, Layers, BookOpen, Image as ImageIcon, MapPin, Phone, Printer, IndianRupee, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 import OrderPrintTemplate from '../components/OrderPrintTemplate';
@@ -150,69 +150,66 @@ const AdminOrderDetails = () => {
                                 <Layers className="w-5 h-5 text-zg-accent" />
                                 Customization Details
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-1">
-                                    <p className="text-zg-secondary text-sm">Binding Type</p>
-                                    <p className="font-medium">{order.bindingType}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-zg-secondary text-sm">Paper Type</p>
-                                    <p className="font-medium">{order.paperType}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-zg-secondary text-sm">Sheet Count</p>
-                                    <p className="font-medium">{order.sheetCount} sheets</p>
-                                </div>
-                                {order.albumColor && (
-                                    <div className="space-y-1">
-                                        <p className="text-zg-secondary text-sm">Album Color</p>
-                                        <p className="font-medium">{order.albumColor}</p>
-                                    </div>
-                                )}
-                                {order.coverType && (
-                                    <div className="space-y-1">
-                                        <p className="text-zg-secondary text-sm">Cover Type</p>
-                                        <p className="font-medium">{order.coverType}</p>
-                                    </div>
-                                )}
-                                <div className="space-y-1">
-                                    <p className="text-zg-secondary text-sm">Box Type</p>
-                                    <p className="font-medium">{order.boxType}</p>
-                                </div>
-                                {order.additionalPaper && (
-                                    <div className="space-y-1">
-                                        <p className="text-zg-secondary text-sm">Additional Paper</p>
-                                        <p className="font-medium">{order.additionalPaper}</p>
-                                    </div>
-                                )}
-                                {order.bagType && (
-                                    <div className="space-y-1">
-                                        <p className="text-zg-secondary text-sm">Bag Type</p>
-                                        <p className="font-medium">{order.bagType}</p>
-                                    </div>
-                                )}
-                                {order.calendarType && (
-                                    <div className="space-y-1">
-                                        <p className="text-zg-secondary text-sm">Calendar Type</p>
-                                        <p className="font-medium">{order.calendarType}</p>
-                                    </div>
-                                )}
-                            </div>
+                            {(() => {
+                                // Build specId → spec label map from populated product specs
+                                const specMap = {};
+                                (order.product?.specifications || []).forEach(({ spec }) => {
+                                    if (spec?._id) specMap[spec._id] = spec.label;
+                                });
 
-                            <div className="mt-6 pt-6 border-t border-zg-secondary/10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${order.acrylicCalendar ? 'bg-green-500/20 text-green-500' : 'bg-zg-secondary/20 text-zg-secondary'}`}>
-                                        {order.acrylicCalendar ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                const hasDynamicSpecs = order.dynamicSpecs && Object.keys(order.dynamicSpecs).length > 0;
+
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Sheet count is always a static field */}
+                                        <div className="space-y-1">
+                                            <p className="text-zg-secondary text-sm">Sheet Count</p>
+                                            <p className="font-medium">{order.sheetCount} sheets</p>
+                                        </div>
+
+                                        {/* Dynamic specs with resolved labels */}
+                                        {hasDynamicSpecs
+                                            ? Object.entries(order.dynamicSpecs).map(([specId, value]) => (
+                                                <div key={specId} className="space-y-1">
+                                                    <p className="text-zg-secondary text-sm">{specMap[specId] || specId}</p>
+                                                    <p className="font-medium">{value}</p>
+                                                </div>
+                                            ))
+                                            : (
+                                                <>
+                                                    <div className="space-y-1">
+                                                        <p className="text-zg-secondary text-sm">Binding Type</p>
+                                                        <p className="font-medium">{order.bindingType}</p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-zg-secondary text-sm">Paper Type</p>
+                                                        <p className="font-medium">{order.paperType}</p>
+                                                    </div>
+                                                    {order.boxType && (
+                                                        <div className="space-y-1">
+                                                            <p className="text-zg-secondary text-sm">Box Type</p>
+                                                            <p className="font-medium">{order.boxType}</p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )
+                                        }
+
+                                        {order.albumColor && (
+                                            <div className="space-y-1">
+                                                <p className="text-zg-secondary text-sm">Album Color</p>
+                                                <p className="font-medium">{order.albumColor}</p>
+                                            </div>
+                                        )}
+                                        {order.bagType && (
+                                            <div className="space-y-1">
+                                                <p className="text-zg-secondary text-sm">Bag Type</p>
+                                                <p className="font-medium">{order.bagType}</p>
+                                            </div>
+                                        )}
                                     </div>
-                                    <span className="text-sm font-medium">Acrylic Calendar</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${order.replicaEbook ? 'bg-green-500/20 text-green-500' : 'bg-zg-secondary/20 text-zg-secondary'}`}>
-                                        {order.replicaEbook ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                    </div>
-                                    <span className="text-sm font-medium">Replica E-Book</span>
-                                </div>
-                            </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Front Page Customization */}
@@ -310,6 +307,58 @@ const AdminOrderDetails = () => {
                             </div>
                         )}
 
+                        {/* Payment Details */}
+                        <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
+                                <IndianRupee className="w-5 h-5 text-zg-accent" />
+                                Payment Details
+                            </h3>
+                            <div className="space-y-4">
+                                {/* Payment status badge */}
+                                <div className="flex items-center justify-between">
+                                    <p className="text-zg-secondary text-sm">Payment Status</p>
+                                    {order.paymentStatus === 'paid' ? (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-500/10 text-green-500 border border-green-500/20">
+                                            <CheckCircle2 className="w-3 h-3" /> Paid
+                                        </span>
+                                    ) : order.paymentStatus === 'failed' ? (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20">
+                                            <XCircle className="w-3 h-3" /> Failed
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+                                            <Clock className="w-3 h-3" /> Pending
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Amount */}
+                                {order.calculatedPrice > 0 && (
+                                    <div className="flex items-center justify-between p-3 bg-zg-bg rounded-xl border border-zg-secondary/10">
+                                        <p className="text-zg-secondary text-sm">Amount</p>
+                                        <p className="font-black text-lg text-zg-accent">₹{order.calculatedPrice.toLocaleString('en-IN')}</p>
+                                    </div>
+                                )}
+
+                                {/* Razorpay IDs */}
+                                {order.razorpayOrderId && (
+                                    <div>
+                                        <p className="text-zg-secondary text-xs mb-1">Razorpay Order ID</p>
+                                        <p className="font-mono text-xs bg-zg-bg border border-zg-secondary/10 rounded-lg px-3 py-2 break-all">{order.razorpayOrderId}</p>
+                                    </div>
+                                )}
+                                {order.razorpayPaymentId && (
+                                    <div>
+                                        <p className="text-zg-secondary text-xs mb-1">Razorpay Payment ID</p>
+                                        <p className="font-mono text-xs bg-zg-bg border border-zg-secondary/10 rounded-lg px-3 py-2 break-all">{order.razorpayPaymentId}</p>
+                                    </div>
+                                )}
+                                {!order.razorpayPaymentId && !order.razorpayOrderId && (
+                                    <p className="text-xs text-zg-secondary/50 italic">No transaction IDs yet.</p>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Assets */}
                         <div className="bg-zg-surface/50 backdrop-blur-xl border border-zg-secondary/10 rounded-2xl p-6">
                             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -330,11 +379,22 @@ const AdminOrderDetails = () => {
                                         </a>
                                     </div>
                                 )}
-                                {order.logo && (
+
+                                {/* Company logo: use order logo if uploaded, else fall back to user's profile logo */}
+                                {(order.logo || order.user?.logo) && (
                                     <div>
-                                        <p className="text-zg-secondary text-xs mb-2">Uploaded Logo</p>
-                                        <div className="w-full aspect-video bg-zg-surface border border-zg-secondary/10 rounded-lg overflow-hidden flex items-center justify-center">
-                                            <img src={getImageUrl(order.logo)} alt="Order Logo" className="max-w-full max-h-full object-contain" />
+                                        <p className="text-zg-secondary text-xs mb-2">
+                                            Company Logo
+                                            {!order.logo && order.user?.logo && (
+                                                <span className="ml-2 text-zg-secondary/50">(from profile)</span>
+                                            )}
+                                        </p>
+                                        <div className="w-full h-24 bg-zg-surface border border-zg-secondary/10 rounded-lg overflow-hidden flex items-center justify-center p-3">
+                                            <img
+                                                src={getImageUrl(order.logo || order.user.logo)}
+                                                alt="Company Logo"
+                                                className="max-w-full max-h-full object-contain"
+                                            />
                                         </div>
                                     </div>
                                 )}
@@ -347,13 +407,5 @@ const AdminOrderDetails = () => {
     );
 };
 
-// Helper icons
-const CheckCircle = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-);
-
-const XCircle = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
-);
 
 export default AdminOrderDetails;

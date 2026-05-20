@@ -87,7 +87,8 @@ const ProductsList = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.02 }}
-                            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-zg-secondary/10 transition-all duration-200 group"
+                            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-zg-secondary/10 transition-all duration-200 group cursor-pointer"
+                            onClick={() => navigate(`/admin/products/${product._id}`)}
                         >
                             <div className="col-span-8 flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-lg bg-zg-secondary/10 flex items-center justify-center text-zg-primary font-bold text-sm flex-shrink-0 overflow-hidden">
@@ -108,13 +109,13 @@ const ProductsList = () => {
 
                             <div className="col-span-4 flex items-center justify-end gap-2">
                                 <button
-                                    onClick={() => navigate(`/admin/products/${product._id}`)}
+                                    onClick={e => { e.stopPropagation(); navigate(`/admin/products/${product._id}`); }}
                                     className="p-2 text-zg-secondary hover:text-zg-primary hover:bg-zg-secondary/10 rounded-lg transition-colors"
                                 >
                                     <Edit className="w-4 h-4" />
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(product._id)}
+                                    onClick={e => { e.stopPropagation(); handleDelete(product._id); }}
                                     className="p-2 text-zg-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                 >
                                     <Trash2 className="w-4 h-4" />

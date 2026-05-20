@@ -1,14 +1,61 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, ArrowLeft, Package, Calendar, Clock } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import API_ENDPOINTS from '../api';
-
 import getImageUrl from '../utils/imageUtils';
 
 const MyOrders = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [retrying, setRetrying] = useState(null);
     const navigate = useNavigate();
+
+    const handleRetryPayment = async (order) => {
+        setRetrying(order._id);
+        try {
+            const res = await fetch(API_ENDPOINTS.PAYMENT_RETRY(order._id), { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) { alert(data.message || 'Failed to retry payment'); return; }
+
+            const options = {
+                key: data.keyId,
+                amount: data.amount,
+                currency: data.currency,
+                name: 'Zero Gravity Albums',
+                description: order.title,
+                order_id: data.razorpayOrderId,
+                prefill: {
+                    name: order.deliveryAddress?.name || '',
+                    contact: order.deliveryAddress?.phone || '',
+                },
+                theme: { color: '#D4AF37' },
+                handler: async (response) => {
+                    const verifyRes = await fetch(API_ENDPOINTS.PAYMENT_VERIFY, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            dbOrderId: order._id
+                        })
+                    });
+                    if (verifyRes.ok) {
+                        setOrders(prev => prev.map(o => o._id === order._id ? { ...o, paymentStatus: 'paid' } : o));
+                    } else {
+                        alert('Payment verification failed. Contact support.');
+                    }
+                },
+                modal: { ondismiss: () => setRetrying(null) }
+            };
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+        } catch {
+            alert('Error retrying payment');
+        } finally {
+            setRetrying(null);
+        }
+    };
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -91,13 +138,24 @@ const MyOrders = () => {
                                                 <h3 className="text-xl font-bold mb-1">{order.title}</h3>
                                                 <p className="text-sm text-zg-secondary">Order ID: {order._id}</p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                                                order.status === 'processing' ? 'bg-blue-500/10 text-blue-500' :
-                                                    order.status === 'cancelled' ? 'bg-red-500/10 text-red-500' :
-                                                        'bg-yellow-500/10 text-yellow-500'
-                                                }`}>
-                                                {order.status}
-                                            </span>
+                                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                                                {order.paymentStatus === 'payment_pending' ? (
+                                                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-orange-500/10 text-orange-500">
+                                                        Payment Pending
+                                                    </span>
+                                                ) : order.paymentStatus === 'paid' ? (
+                                                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-500/10 text-green-500">
+                                                        Paid
+                                                    </span>
+                                                ) : null}
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${order.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                                                    order.status === 'processing' ? 'bg-blue-500/10 text-blue-500' :
+                                                        order.status === 'cancelled' ? 'bg-red-500/10 text-red-500' :
+                                                            'bg-yellow-500/10 text-yellow-500'
+                                                    }`}>
+                                                    {order.status}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -118,6 +176,20 @@ const MyOrders = () => {
                                                 <p className="font-medium">{new Date(order.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>
+
+                                        {order.paymentStatus === 'payment_pending' && (
+                                            <div className="mt-4 pt-4 border-t border-zg-secondary/10 flex items-center justify-between">
+                                                <p className="text-sm text-orange-400">Payment incomplete. Complete payment to confirm your order.</p>
+                                                <button
+                                                    onClick={() => handleRetryPayment(order)}
+                                                    disabled={retrying === order._id}
+                                                    className="flex items-center gap-2 px-5 py-2 bg-zg-accent text-black font-bold rounded-xl hover:bg-zg-accent-hover transition-all text-sm disabled:opacity-50"
+                                                >
+                                                    <RefreshCw className={`w-4 h-4 ${retrying === order._id ? 'animate-spin' : ''}`} />
+                                                    {retrying === order._id ? 'Opening...' : 'Retry Payment'}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

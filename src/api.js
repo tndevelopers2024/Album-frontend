@@ -1,5 +1,5 @@
 // API Configuration
-const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'https://dev.placetest.in';
+const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5007';
 const API_BASE_URL = `${SERVER_URL}/api`;
 
 // Helper function to build full URL

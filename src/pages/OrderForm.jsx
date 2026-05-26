@@ -71,23 +71,27 @@ const OrderForm = () => {
 
     useEffect(() => { if (pricing && product) calculatePrice(); }, [formData.bindingType, formData.paperType, formData.sheetCount, formData.dynamicSpecs, pricing, product]);
 
-    // Clear size selections when Layflat is chosen (sizes don't apply)
+    // Clear binding type and size selections when NT or Layflat is chosen (not applicable)
     useEffect(() => {
         if (!product) return;
-        const bindingSpec = (product.specifications || []).find(
-            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
+        const paperSpec = (product.specifications || []).find(
+            ({ spec }) => spec?.label?.toLowerCase().includes('paper')
         );
-        if (!bindingSpec) return;
-        const selectedBinding = formData.dynamicSpecs[bindingSpec.spec._id];
-        if (selectedBinding !== 'Layflat') return;
+        if (!paperSpec) return;
+        const selectedPaper = formData.dynamicSpecs[paperSpec.spec._id];
+        if (selectedPaper !== 'Layflat') return;
+        const bindingSpecIds = (product.specifications || [])
+            .filter(({ spec }) => spec?.label?.toLowerCase().includes('binding'))
+            .map(({ spec }) => spec._id);
         const sizeSpecIds = (product.specifications || [])
             .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
             .map(({ spec }) => spec._id);
-        const hasAnySize = sizeSpecIds.some(id => formData.dynamicSpecs[id] !== undefined);
-        if (!hasAnySize) return;
+        const specsToRemove = [...bindingSpecIds, ...sizeSpecIds];
+        const hasAny = specsToRemove.some(id => formData.dynamicSpecs[id] !== undefined);
+        if (!hasAny) return;
         setFormData(p => {
             const updatedDynamic = { ...p.dynamicSpecs };
-            sizeSpecIds.forEach(id => { delete updatedDynamic[id]; });
+            specsToRemove.forEach(id => { delete updatedDynamic[id]; });
             return { ...p, dynamicSpecs: updatedDynamic };
         });
     }, [formData.dynamicSpecs, product]);
@@ -112,46 +116,82 @@ const OrderForm = () => {
     const calculatePrice = () => {
         if (!pricing || !product) return;
 
-        // Find binding and paper specs by label to get their MongoDB IDs
-        const bindingSpecEntry = (product.specifications || []).find(
-            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
-        );
+        // Paper spec (label 'paper') now has NT/Layflat — drives sheet pricing
         const paperSpecEntry = (product.specifications || []).find(
             ({ spec }) => spec?.label?.toLowerCase().includes('paper')
         );
-        const bindingSpecId = bindingSpecEntry?.spec?._id;
+        // Binding spec (label 'binding') now has Glossy/Matte/etc. — flat add-on cost
+        const bindingSpecEntry = (product.specifications || []).find(
+            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
+        );
         const paperSpecId = paperSpecEntry?.spec?._id;
+        const bindingSpecId = bindingSpecEntry?.spec?._id;
 
-        const bindingType = (bindingSpecId ? formData.dynamicSpecs[bindingSpecId] : null) || formData.bindingType;
         const paperType = (paperSpecId ? formData.dynamicSpecs[paperSpecId] : null) || formData.paperType;
+        const bindingType = (bindingSpecId ? formData.dynamicSpecs[bindingSpecId] : null) || formData.bindingType;
         const sheetCount = formData.sheetCount;
 
+        // Helper: get effective price for an option (product override > master spec price)
+        const getEffectivePrice = (specEntry, label, fallback = 0) => {
+            const productSpec = (product.specifications || []).find(
+                s => (s.spec?._id || s.spec) === specEntry?.spec?._id
+            );
+            const enabledOpt = productSpec?.enabledOptions?.find(o =>
+                typeof o === 'string' ? o === label : o.label === label
+            );
+            if (enabledOpt && typeof enabledOpt === 'object' && enabledOpt.price !== null && enabledOpt.price !== undefined) {
+                return enabledOpt.price;
+            }
+            return specEntry?.spec?.options?.find(o => o.label === label)?.price ?? fallback;
+        };
+
         let sheetCost = 0;
-        if (bindingType === 'Layflat') {
-            sheetCost = (pricing.sheetTypes?.Layflat?.pricePerSheet || 0) * sheetCount;
-        } else if (bindingType === 'NT' && paperType) {
-            const paperOption = paperSpecEntry?.spec?.options?.find(o => o.label === paperType);
-            sheetCost = (paperOption?.price || 0) * sheetCount;
+        if (paperType === 'Layflat') {
+            const layfllatPrice = getEffectivePrice(paperSpecEntry, 'Layflat', pricing.sheetTypes?.Layflat?.pricePerSheet || 0);
+            sheetCost = layfllatPrice * sheetCount;
+        } else if (paperType === 'NT' && bindingType) {
+            const bindingPrice = getEffectivePrice(bindingSpecEntry, bindingType, 0);
+            sheetCost = bindingPrice * sheetCount;
         }
 
         const coverBoxCost = product?.boxPrice || 0;
 
-        // Dynamic specs cost — skip binding and paper specs (already in sheetCost)
-        let dynamicSpecsCost = 0;
+        // Split dynamic specs: sizes go into sizeCost (for Box & Pad), bags shown separately, rest is otherSpecsCost
+        let sizeCost = 0;
+        let bagCost = 0;
+        let bagLabel = '';
+        let otherSpecsCost = 0;
+
         if (product?.specifications) {
-            product.specifications.forEach(({ spec }) => {
+            product.specifications.forEach(({ spec, enabledOptions: specEnabledOpts }) => {
                 if (!spec) return;
-                if (spec._id === bindingSpecId || spec._id === paperSpecId) return;
+                if (spec._id === paperSpecId || spec._id === bindingSpecId) return;
                 const selectedOptionLabel = formData.dynamicSpecs[spec._id];
-                if (selectedOptionLabel) {
-                    const option = spec.options.find(o => o.label === selectedOptionLabel);
-                    if (option) dynamicSpecsCost += (option.price || 0);
+                if (!selectedOptionLabel) return;
+                // Use product-level override if available, else master spec price
+                const enabledOpt = (specEnabledOpts || []).find(o =>
+                    typeof o === 'string' ? o === selectedOptionLabel : o.label === selectedOptionLabel
+                );
+                const overridePrice = enabledOpt && typeof enabledOpt === 'object' && enabledOpt.price !== null && enabledOpt.price !== undefined
+                    ? enabledOpt.price : null;
+                const price = overridePrice !== null ? overridePrice : (spec.options?.find(o => o.label === selectedOptionLabel)?.price || 0);
+
+                if (spec.label?.toLowerCase().includes('size')) {
+                    sizeCost += price;
+                } else if (spec.label?.toLowerCase().includes('bag')) {
+                    bagCost = price;
+                    bagLabel = selectedOptionLabel;
+                } else {
+                    otherSpecsCost += price;
                 }
             });
         }
 
-        const totalPrice = sheetCost + coverBoxCost + dynamicSpecsCost;
-        setPriceBreakdown({ sheetCost, coverBoxCost, dynamicSpecsCost, totalPrice, bindingType, paperType });
+        const dynamicSpecsCost = sizeCost + bagCost + otherSpecsCost;
+        const subTotal = sheetCost + coverBoxCost + dynamicSpecsCost;
+        const tax = Math.round(subTotal * 0.18);
+        const totalPrice = subTotal + tax;
+        setPriceBreakdown({ sheetCost, coverBoxCost, sizeCost, bagCost, bagLabel, otherSpecsCost, dynamicSpecsCost, subTotal, tax, totalPrice, bindingType, paperType });
         setCalculatedPrice(totalPrice);
     };
 
@@ -194,18 +234,20 @@ const OrderForm = () => {
             case 1: {
                 const specs = product?.specifications || [];
 
-                const bindingSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('binding'));
-                const selectedBinding = bindingSpecEntry
-                    ? formData.dynamicSpecs[bindingSpecEntry.spec._id]
-                    : formData.bindingType;
+                // Paper type (NT/Layflat) is the primary required selection
+                const paperSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('paper'));
+                const selectedPaper = paperSpecEntry
+                    ? formData.dynamicSpecs[paperSpecEntry.spec._id]
+                    : formData.paperType;
 
-                if (!selectedBinding) { showToast('Please select a binding type'); return false; }
+                if (!selectedPaper) { showToast('Please select a paper type'); return false; }
 
-                if (selectedBinding !== 'Layflat') {
-                    // Paper type required
-                    const paperSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('paper'));
-                    if (paperSpecEntry && !formData.dynamicSpecs[paperSpecEntry.spec._id]) {
-                        showToast('Please select a paper type'); return false;
+                // Only Layflat skips binding type and size selection; NT requires them
+                if (selectedPaper !== 'Layflat') {
+                    // Binding type required
+                    const bindingSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('binding'));
+                    if (bindingSpecEntry && !formData.dynamicSpecs[bindingSpecEntry.spec._id]) {
+                        showToast('Please select a binding type'); return false;
                     }
 
                     // At least one size required
@@ -404,25 +446,25 @@ const OrderForm = () => {
             case 1: return (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {[...(product?.specifications || [])].sort((a, b) => {
-                        const aIsBinding = a.spec?.label?.toLowerCase().includes('binding') ? -1 : 0;
-                        const bIsBinding = b.spec?.label?.toLowerCase().includes('binding') ? -1 : 0;
-                        return aIsBinding - bIsBinding;
+                        const aIsPaper = a.spec?.label?.toLowerCase().includes('paper') ? -1 : 0;
+                        const bIsPaper = b.spec?.label?.toLowerCase().includes('paper') ? -1 : 0;
+                        return aIsPaper - bIsPaper;
                     }).map(({ spec, enabledOptions }) => {
                         if (!spec) return null;
 
-                        // Determine selected binding type from dynamicSpecs
-                        const bindingSpec = (product?.specifications || []).find(
-                            ({ spec: s }) => s?.label?.toLowerCase().includes('binding')
+                        // Determine selected paper type (NT/Layflat) from dynamicSpecs
+                        const paperSpecEntry = (product?.specifications || []).find(
+                            ({ spec: s }) => s?.label?.toLowerCase().includes('paper')
                         );
-                        const selectedBinding = bindingSpec
-                            ? formData.dynamicSpecs[bindingSpec.spec._id]
-                            : formData.bindingType;
+                        const selectedPaper = paperSpecEntry
+                            ? formData.dynamicSpecs[paperSpecEntry.spec._id]
+                            : formData.paperType;
 
-                        // Hide paper type and size sections when Layflat is selected
+                        // Hide binding type and size sections when NT or Layflat is selected
                         const isSizeSpec = spec.label?.toLowerCase().includes('size');
                         const isPaperSpec = spec.label?.toLowerCase().includes('paper');
                         const isBindingSpec = spec.label?.toLowerCase().includes('binding');
-                        if (selectedBinding === 'Layflat' && (isSizeSpec || isPaperSpec)) return null;
+                        if (selectedPaper === 'Layflat' && (isBindingSpec || isSizeSpec)) return null;
 
                         // Collect all size spec IDs so selecting one clears the others
                         const allSizeSpecIds = (product?.specifications || [])
@@ -430,16 +472,21 @@ const OrderForm = () => {
                             .map(({ spec: s }) => s._id);
 
                         const visibleOptions = enabledOptions?.length > 0
-                            ? enabledOptions.map(lbl => spec.options.find(o => o.label === lbl) || { label: lbl, price: 0 })
+                            ? enabledOptions.map(opt => {
+                                const label = typeof opt === 'string' ? opt : opt.label;
+                                const overridePrice = typeof opt === 'object' && opt.price !== null && opt.price !== undefined ? opt.price : null;
+                                const masterOpt = spec.options.find(o => o.label === label) || { label, price: 0 };
+                                return overridePrice !== null ? { ...masterOpt, price: overridePrice } : masterOpt;
+                            })
                             : spec.options;
                         return (
                             <div key={spec._id} className="space-y-4">
                                 <label className={labelCls}>{spec.label}</label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                     {visibleOptions.map((opt) => {
-                                        // Show per-sheet price for paper types (from pricing config)
-                                        const layflantPerSheet = isBindingSpec && opt.label === 'Layflat' ? pricing?.sheetTypes?.Layflat?.pricePerSheet : null;
-                                        const priceLabel = isPaperSpec && opt.price > 0 ? `₹${opt.price}/sheet` : layflantPerSheet ? `₹${layflantPerSheet}/sheet` : opt.price > 0 ? `+ ₹${opt.price}` : null;
+                                        // Layflat (in paper spec) shows per-sheet price; binding options show flat add-on
+                                        const layflantPerSheet = isPaperSpec && opt.label === 'Layflat' ? pricing?.sheetTypes?.Layflat?.pricePerSheet : null;
+                                        const priceLabel = layflantPerSheet ? `₹${layflantPerSheet}/sheet` : opt.price > 0 ? `+ ₹${opt.price}` : null;
                                         return (
                                             <SelectionCard
                                                 key={opt.label}
@@ -686,31 +733,36 @@ const OrderForm = () => {
                         </p>
                         <div className="space-y-3">
                             <div className="flex justify-between text-sm">
-                                <span className="text-zg-secondary">Base Price</span>
-                                <span className="font-medium text-zg-primary">Included</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
                                 <span className="text-zg-secondary">
-                                    {formData.sheetCount} Sheets ({priceBreakdown.bindingType || formData.bindingType}
-                                    {priceBreakdown.bindingType !== 'Layflat' && priceBreakdown.paperType ? ` · ${priceBreakdown.paperType}` : ''})
+                                    {formData.sheetCount} Sheets
+                                    {priceBreakdown.paperType ? ` (${priceBreakdown.paperType}${priceBreakdown.paperType !== 'NT' && priceBreakdown.paperType !== 'Layflat' && priceBreakdown.bindingType ? ` · ${priceBreakdown.bindingType}` : ''})` : ''}
                                 </span>
-                                <span className="font-medium text-zg-primary">₹{priceBreakdown.sheetCost.toLocaleString('en-IN')}</span>
+                                <span className="font-medium text-zg-primary">₹{(priceBreakdown.sheetCost || 0).toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-zg-secondary">Box & Cover</span>
-                                <span className="font-medium text-zg-primary">₹{priceBreakdown.coverBoxCost.toLocaleString('en-IN')}</span>
+                                <span className="text-zg-secondary">Box & Pad</span>
+                                <span className="font-medium text-zg-primary">₹{((priceBreakdown.sizeCost || 0) + (priceBreakdown.coverBoxCost || 0)).toLocaleString('en-IN')}</span>
                             </div>
-                            {priceBreakdown.dynamicSpecsCost > 0 && (
+                            {priceBreakdown.bagCost > 0 && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-zg-secondary">Add-ons / Options</span>
-                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.dynamicSpecsCost.toLocaleString('en-IN')}</span>
+                                    <span className="text-zg-secondary">Bag: {priceBreakdown.bagLabel}</span>
+                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.bagCost.toLocaleString('en-IN')}</span>
                                 </div>
                             )}
+                            {priceBreakdown.otherSpecsCost > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zg-secondary">Add-ons / Options</span>
+                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.otherSpecsCost.toLocaleString('en-IN')}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-sm pt-2 border-t border-zg-secondary/10">
+                                <span className="text-zg-secondary">GST (18%)</span>
+                                <span className="font-medium text-zg-primary">₹{(priceBreakdown.tax || 0).toLocaleString('en-IN')}</span>
+                            </div>
                             <div className="pt-3 border-t border-zg-secondary/10 flex justify-between items-center">
                                 <span className="font-bold">Total</span>
-                                <span className="text-2xl font-black text-zg-accent">₹{priceBreakdown.totalPrice.toLocaleString('en-IN')}</span>
+                                <span className="text-2xl font-black text-zg-accent">₹{(priceBreakdown.totalPrice || 0).toLocaleString('en-IN')}</span>
                             </div>
-                            <p className="text-[10px] text-zg-secondary uppercase tracking-widest text-right">Inclusive of all taxes</p>
                         </div>
                     </div>
                 </div>
@@ -754,7 +806,7 @@ const OrderForm = () => {
                             <p className="text-xs text-zg-secondary">Total</p>
                             <p className="text-xl font-black text-zg-accent">₹{priceBreakdown.totalPrice.toLocaleString('en-IN')}</p>
                         </div>
-                        <p className="text-xs text-zg-secondary">{formData.sheetCount} sheets · {priceBreakdown.bindingType || formData.bindingType}{priceBreakdown.bindingType !== 'Layflat' && priceBreakdown.paperType ? ` · ${priceBreakdown.paperType}` : ''}</p>
+                        <p className="text-xs text-zg-secondary">{formData.sheetCount} sheets · {priceBreakdown.paperType || formData.paperType}{priceBreakdown.paperType !== 'NT' && priceBreakdown.paperType !== 'Layflat' && priceBreakdown.bindingType ? ` · ${priceBreakdown.bindingType}` : ''}</p>
                     </div>
 
                     {/* Navigation */}

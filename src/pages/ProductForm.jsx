@@ -42,6 +42,8 @@ const ProductForm = () => {
         masterSpecs: []
     });
 
+    const [editingPrice, setEditingPrice] = useState(null); // { specId, label }
+
     // Store file objects for deferred upload
     const [imageFile, setImageFile] = useState(null);
     const [galleryFiles, setGalleryFiles] = useState([]);
@@ -110,7 +112,9 @@ const ProductForm = () => {
                 colors: data.colors || [],
                 specifications: data.specifications?.map(s => ({
                     spec: s.spec?._id || s.spec || s._id || s,
-                    enabledOptions: s.enabledOptions || []
+                    enabledOptions: (s.enabledOptions || []).map(o =>
+                        typeof o === 'string' ? { label: o, price: null } : { label: o.label, price: o.price ?? null }
+                    )
                 })).filter(s => s.spec) || []
             });
         } catch (error) {
@@ -309,6 +313,7 @@ const ProductForm = () => {
 
     const isSpecSelected = (specId) => formData.specifications.some(s => s.spec === specId);
     const getEnabledOptions = (specId) => formData.specifications.find(s => s.spec === specId)?.enabledOptions || [];
+    const getEnabledOptionLabels = (specId) => getEnabledOptions(specId).map(o => o.label);
 
     const toggleSpec = (specId, masterOptions) => {
         const selected = isSpecSelected(specId);
@@ -316,7 +321,7 @@ const ProductForm = () => {
             ...prev,
             specifications: selected
                 ? prev.specifications.filter(s => s.spec !== specId)
-                : [...prev.specifications, { spec: specId, enabledOptions: masterOptions.map(o => o.label) }]
+                : [...prev.specifications, { spec: specId, enabledOptions: masterOptions.map(o => ({ label: o.label, price: null })) }]
         }));
     };
 
@@ -325,8 +330,28 @@ const ProductForm = () => {
             ...prev,
             specifications: prev.specifications.map(s => {
                 if (s.spec !== specId) return s;
-                const has = s.enabledOptions.includes(optionLabel);
-                return { ...s, enabledOptions: has ? s.enabledOptions.filter(o => o !== optionLabel) : [...s.enabledOptions, optionLabel] };
+                const has = s.enabledOptions.some(o => o.label === optionLabel);
+                return {
+                    ...s,
+                    enabledOptions: has
+                        ? s.enabledOptions.filter(o => o.label !== optionLabel)
+                        : [...s.enabledOptions, { label: optionLabel, price: null }]
+                };
+            })
+        }));
+    };
+
+    const updateOptionPrice = (specId, optionLabel, price) => {
+        setFormData(prev => ({
+            ...prev,
+            specifications: prev.specifications.map(s => {
+                if (s.spec !== specId) return s;
+                return {
+                    ...s,
+                    enabledOptions: s.enabledOptions.map(o =>
+                        o.label === optionLabel ? { ...o, price: price === '' || price === null ? null : Number(price) } : o
+                    )
+                };
             })
         }));
     };
@@ -693,6 +718,7 @@ const ProductForm = () => {
                                 {suggestions.masterSpecs.map(spec => {
                                     const isSelected = isSpecSelected(spec._id);
                                     const enabledOptions = getEnabledOptions(spec._id);
+                                    const enabledLabels = enabledOptions.map(o => o.label);
                                     return (
                                         <div
                                             key={spec._id}
@@ -718,37 +744,80 @@ const ProductForm = () => {
                                             {/* Option checkboxes + custom input — only when spec is selected */}
                                             {isSelected && (
                                                 <div className="px-4 pb-4 border-t border-zg-secondary/10 pt-3 space-y-3">
+                                                    <p className="text-[10px] text-zg-secondary uppercase tracking-wider">Click price to override for this product</p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {/* Master spec options */}
                                                         {spec.options.map(opt => {
-                                                            const isOptOn = enabledOptions.includes(opt.label);
+                                                            const isOptOn = enabledLabels.includes(opt.label);
+                                                            const enabledOpt = enabledOptions.find(o => o.label === opt.label);
+                                                            const hasOverride = enabledOpt?.price !== null && enabledOpt?.price !== undefined;
+                                                            const displayPrice = hasOverride ? enabledOpt.price : opt.price;
+                                                            const isEditingThis = editingPrice?.specId === spec._id && editingPrice?.label === opt.label;
                                                             return (
-                                                                <button
+                                                                <div
                                                                     key={opt.label}
-                                                                    type="button"
-                                                                    onClick={() => toggleOption(spec._id, opt.label)}
-                                                                    className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-all ${
+                                                                    className={`flex items-center rounded-lg border font-bold text-xs transition-all overflow-hidden ${
                                                                         isOptOn
                                                                             ? 'bg-zg-accent text-black border-zg-accent'
                                                                             : 'bg-zg-bg text-zg-secondary border-zg-secondary/20 hover:border-zg-secondary/50'
                                                                     }`}
                                                                 >
-                                                                    {opt.label}
-                                                                    {opt.price > 0 && <span className="ml-1 opacity-70">+₹{opt.price}</span>}
-                                                                </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleOption(spec._id, opt.label)}
+                                                                        className="px-2.5 py-1"
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                    {/* Price badge — only when enabled */}
+                                                                    {isOptOn && (
+                                                                        isEditingThis ? (
+                                                                            <input
+                                                                                type="number"
+                                                                                autoFocus
+                                                                                defaultValue={displayPrice ?? ''}
+                                                                                placeholder={String(opt.price ?? 0)}
+                                                                                className="w-16 text-[10px] bg-black/20 px-1.5 py-1 text-black outline-none border-l border-black/20"
+                                                                                onBlur={(e) => {
+                                                                                    const val = e.target.value.trim();
+                                                                                    const parsed = val === '' ? null : Number(val);
+                                                                                    updateOptionPrice(spec._id, opt.label, parsed === opt.price ? null : parsed);
+                                                                                    setEditingPrice(null);
+                                                                                }}
+                                                                                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { setEditingPrice(null); } }}
+                                                                            />
+                                                                        ) : (
+                                                                            <span
+                                                                                title={hasOverride ? 'Custom price — click to edit' : 'Master price — click to override'}
+                                                                                onClick={() => setEditingPrice({ specId: spec._id, label: opt.label })}
+                                                                                className={`px-1.5 py-1 text-[10px] cursor-pointer border-l border-black/20 transition-colors hover:bg-black/10 ${hasOverride ? 'font-black' : 'opacity-60'}`}
+                                                                            >
+                                                                                ₹{displayPrice ?? 0}{hasOverride ? '*' : ''}
+                                                                            </span>
+                                                                        )
+                                                                    )}
+                                                                    {/* Disabled: show master price hint */}
+                                                                    {!isOptOn && opt.price > 0 && (
+                                                                        <span className="px-1.5 py-1 text-[10px] opacity-50 border-l border-zg-secondary/20">+₹{opt.price}</span>
+                                                                    )}
+                                                                </div>
                                                             );
                                                         })}
                                                         {/* Custom options added for this product */}
-                                                        {enabledOptions.filter(lbl => !spec.options.find(o => o.label === lbl)).map(lbl => (
-                                                            <button
-                                                                key={lbl}
-                                                                type="button"
-                                                                onClick={() => toggleOption(spec._id, lbl)}
-                                                                className="text-xs px-2.5 py-1 rounded-lg border font-bold bg-zg-accent text-black border-zg-accent flex items-center gap-1"
+                                                        {enabledOptions.filter(o => !spec.options.find(opt => opt.label === o.label)).map(o => (
+                                                            <div
+                                                                key={o.label}
+                                                                className="flex items-center rounded-lg border font-bold text-xs bg-zg-accent text-black border-zg-accent overflow-hidden"
                                                             >
-                                                                {lbl}
-                                                                <X size={10} />
-                                                            </button>
+                                                                <span className="px-2.5 py-1">{o.label}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => toggleOption(spec._id, o.label)}
+                                                                    className="px-1.5 py-1 border-l border-black/20 hover:bg-black/10"
+                                                                >
+                                                                    <X size={10} />
+                                                                </button>
+                                                            </div>
                                                         ))}
                                                     </div>
                                                     {/* Add custom value input */}
@@ -761,7 +830,7 @@ const ProductForm = () => {
                                                                 if (e.key === 'Enter') {
                                                                     e.preventDefault();
                                                                     const val = e.target.value.trim();
-                                                                    if (val && !enabledOptions.includes(val)) {
+                                                                    if (val && !enabledLabels.includes(val)) {
                                                                         toggleOption(spec._id, val);
                                                                     }
                                                                     e.target.value = '';
@@ -773,7 +842,7 @@ const ProductForm = () => {
                                                             onClick={(e) => {
                                                                 const input = e.currentTarget.previousSibling;
                                                                 const val = input.value.trim();
-                                                                if (val && !enabledOptions.includes(val)) {
+                                                                if (val && !enabledLabels.includes(val)) {
                                                                     toggleOption(spec._id, val);
                                                                 }
                                                                 input.value = '';

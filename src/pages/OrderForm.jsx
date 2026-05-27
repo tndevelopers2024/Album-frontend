@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Upload, CheckCircle, XCircle, IndianRupee, Check, AlertCircle, CheckCircle2, BookOpen, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, XCircle, IndianRupee, Check, AlertCircle, CheckCircle2, BookOpen, Minus, Plus, Calendar } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import '../datepicker.css';
 import API_ENDPOINTS from '../api';
 import getImageUrl from '../utils/imageUtils';
 
@@ -81,12 +84,9 @@ const OrderForm = () => {
         const selectedPaper = formData.dynamicSpecs[paperSpec.spec._id];
         if (selectedPaper !== 'Layflat') return;
         const bindingSpecIds = (product.specifications || [])
-            .filter(({ spec }) => spec?.label?.toLowerCase().includes('binding'))
+            .filter(({ spec }) => (spec?.label?.toLowerCase().includes('binding') || spec?.label?.toLowerCase().includes('laminate')))
             .map(({ spec }) => spec._id);
-        const sizeSpecIds = (product.specifications || [])
-            .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
-            .map(({ spec }) => spec._id);
-        const specsToRemove = [...bindingSpecIds, ...sizeSpecIds];
+        const specsToRemove = [...bindingSpecIds];
         const hasAny = specsToRemove.some(id => formData.dynamicSpecs[id] !== undefined);
         if (!hasAny) return;
         setFormData(p => {
@@ -122,7 +122,7 @@ const OrderForm = () => {
         );
         // Binding spec (label 'binding') now has Glossy/Matte/etc. — flat add-on cost
         const bindingSpecEntry = (product.specifications || []).find(
-            ({ spec }) => spec?.label?.toLowerCase().includes('binding')
+            ({ spec }) => (spec?.label?.toLowerCase().includes('binding') || spec?.label?.toLowerCase().includes('laminate'))
         );
         const paperSpecId = paperSpecEntry?.spec?._id;
         const bindingSpecId = bindingSpecEntry?.spec?._id;
@@ -156,11 +156,9 @@ const OrderForm = () => {
 
         const coverBoxCost = product?.boxPrice || 0;
 
-        // Split dynamic specs: sizes go into sizeCost (for Box & Pad), bags shown separately, rest is otherSpecsCost
+        // Sizes → sizeCost (Box & Pad). Everything else → individual addOnItems line in summary.
         let sizeCost = 0;
-        let bagCost = 0;
-        let bagLabel = '';
-        let otherSpecsCost = 0;
+        const addOnItems = []; // { label, value, price } — one per selected non-paper/non-laminate/non-size spec
 
         if (product?.specifications) {
             product.specifications.forEach(({ spec, enabledOptions: specEnabledOpts }) => {
@@ -178,20 +176,17 @@ const OrderForm = () => {
 
                 if (spec.label?.toLowerCase().includes('size')) {
                     sizeCost += price;
-                } else if (spec.label?.toLowerCase().includes('bag')) {
-                    bagCost = price;
-                    bagLabel = selectedOptionLabel;
                 } else {
-                    otherSpecsCost += price;
+                    addOnItems.push({ label: spec.label, value: selectedOptionLabel, price });
                 }
             });
         }
 
-        const dynamicSpecsCost = sizeCost + bagCost + otherSpecsCost;
-        const subTotal = sheetCost + coverBoxCost + dynamicSpecsCost;
+        const dynamicSpecsCost = sizeCost + addOnItems.reduce((s, i) => s + i.price, 0);
+        const subTotal = sheetCost + dynamicSpecsCost;
         const tax = Math.round(subTotal * 0.18);
         const totalPrice = subTotal + tax;
-        setPriceBreakdown({ sheetCost, coverBoxCost, sizeCost, bagCost, bagLabel, otherSpecsCost, dynamicSpecsCost, subTotal, tax, totalPrice, bindingType, paperType });
+        setPriceBreakdown({ sheetCost, coverBoxCost, sizeCost, addOnItems, dynamicSpecsCost, subTotal, tax, totalPrice, bindingType, paperType });
         setCalculatedPrice(totalPrice);
     };
 
@@ -242,22 +237,22 @@ const OrderForm = () => {
 
                 if (!selectedPaper) { showToast('Please select a paper type'); return false; }
 
-                // Only Layflat skips binding type and size selection; NT requires them
+                // Layflat only hides Laminate Type — size is required for both
                 if (selectedPaper !== 'Layflat') {
-                    // Binding type required
-                    const bindingSpecEntry = specs.find(({ spec }) => spec?.label?.toLowerCase().includes('binding'));
+                    // Laminate type required for NT
+                    const bindingSpecEntry = specs.find(({ spec }) => (spec?.label?.toLowerCase().includes('binding') || spec?.label?.toLowerCase().includes('laminate')));
                     if (bindingSpecEntry && !formData.dynamicSpecs[bindingSpecEntry.spec._id]) {
-                        showToast('Please select a binding type'); return false;
+                        showToast('Please select a laminate type'); return false;
                     }
+                }
 
-                    // At least one size required
-                    const sizeSpecIds = specs
-                        .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
-                        .map(({ spec }) => spec._id);
-                    const hasSize = sizeSpecIds.some(id => formData.dynamicSpecs[id]);
-                    if (sizeSpecIds.length > 0 && !hasSize) {
-                        showToast('Please select a size'); return false;
-                    }
+                // Size required for both NT and Layflat
+                const sizeSpecIds = specs
+                    .filter(({ spec }) => spec?.label?.toLowerCase().includes('size'))
+                    .map(({ spec }) => spec._id);
+                const hasSize = sizeSpecIds.some(id => formData.dynamicSpecs[id]);
+                if (sizeSpecIds.length > 0 && !hasSize) {
+                    showToast('Please select a size'); return false;
                 }
 
                 return true;
@@ -404,7 +399,7 @@ const OrderForm = () => {
                             <label className={labelCls}>Sheet Count <span className="text-zg-accent">*</span></label>
                             <p className="text-[10px] text-zg-secondary mb-3 uppercase font-bold tracking-tighter">Min 20 - Max 60 sheets</p>
                             <div className="flex items-center gap-6 p-4 bg-zg-bg rounded-2xl border border-zg-secondary/10">
-                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.max(20, p.sheetCount - 2) }))}
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.max(20, p.sheetCount - 1) }))}
                                     className="w-12 h-12 rounded-xl bg-zg-surface flex items-center justify-center hover:bg-zg-accent hover:text-black transition-all shadow-lg active:scale-95 border border-zg-secondary/5">
                                     <Minus className="w-5 h-5" />
                                 </button>
@@ -412,7 +407,7 @@ const OrderForm = () => {
                                     <span className="text-3xl font-black text-zg-accent">{formData.sheetCount}</span>
                                     <span className="ml-2 text-zg-secondary text-xs font-bold uppercase">Sheets</span>
                                 </div>
-                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.min(60, p.sheetCount + 2) }))}
+                                <button type="button" onClick={() => setFormData(p => ({ ...p, sheetCount: Math.min(60, p.sheetCount + 1) }))}
                                     className="w-12 h-12 rounded-xl bg-zg-surface flex items-center justify-center hover:bg-zg-accent hover:text-black transition-all shadow-lg active:scale-95 border border-zg-secondary/5">
                                     <Plus className="w-5 h-5" />
                                 </button>
@@ -463,8 +458,8 @@ const OrderForm = () => {
                         // Hide binding type and size sections when NT or Layflat is selected
                         const isSizeSpec = spec.label?.toLowerCase().includes('size');
                         const isPaperSpec = spec.label?.toLowerCase().includes('paper');
-                        const isBindingSpec = spec.label?.toLowerCase().includes('binding');
-                        if (selectedPaper === 'Layflat' && (isBindingSpec || isSizeSpec)) return null;
+                        const isBindingSpec = spec.label?.toLowerCase().includes('binding') || spec.label?.toLowerCase().includes('laminate');
+                        if (selectedPaper === 'Layflat' && isBindingSpec) return null;
 
                         // Collect all size spec IDs so selecting one clears the others
                         const allSizeSpecIds = (product?.specifications || [])
@@ -481,7 +476,7 @@ const OrderForm = () => {
                             : spec.options;
                         return (
                             <div key={spec._id} className="space-y-4">
-                                <label className={labelCls}>{spec.label}</label>
+                                <label className={labelCls}>{spec.label?.toLowerCase().includes('binding') ? 'Laminate Type' : spec.label}</label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                     {visibleOptions.map((opt) => {
                                         // Layflat (in paper spec) shows per-sheet price; binding options show flat add-on
@@ -592,7 +587,23 @@ const OrderForm = () => {
                                                 placeholder={`Enter ${option.label.toLowerCase()}`} className={inputCls} />
                                         )}
                                         {option.type === 'date' && (
-                                            <input type="date" value={formData.frontPageCustomization[option.id] || ''} onChange={e => handleCustomizationChange(option.id, e.target.value)} className={inputCls} />
+                                            <div className="relative">
+                                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zg-secondary pointer-events-none z-10" />
+                                                <DatePicker
+                                                    selected={formData.frontPageCustomization[option.id] ? new Date(formData.frontPageCustomization[option.id]) : null}
+                                                    onChange={(date) => handleCustomizationChange(option.id, date ? date.toISOString().split('T')[0] : '')}
+                                                    dateFormat="dd MMM yyyy"
+                                                    placeholderText="Select a date"
+                                                    showMonthDropdown
+                                                    showYearDropdown
+                                                    dropdownMode="select"
+                                                    yearDropdownItemNumber={50}
+                                                    scrollableYearDropdown
+                                                    className={`${inputCls} pl-12 cursor-pointer`}
+                                                    wrapperClassName="w-full"
+                                                    popperPlacement="bottom-start"
+                                                />
+                                            </div>
                                         )}
                                         {option.type === 'image' && (
                                             <div className="flex gap-4 items-center">
@@ -741,20 +752,14 @@ const OrderForm = () => {
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-zg-secondary">Box & Pad</span>
-                                <span className="font-medium text-zg-primary">₹{((priceBreakdown.sizeCost || 0) + (priceBreakdown.coverBoxCost || 0)).toLocaleString('en-IN')}</span>
+                                <span className="font-medium text-zg-primary">₹{(priceBreakdown.sizeCost || 0).toLocaleString('en-IN')}</span>
                             </div>
-                            {priceBreakdown.bagCost > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-zg-secondary">Bag: {priceBreakdown.bagLabel}</span>
-                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.bagCost.toLocaleString('en-IN')}</span>
+                            {(priceBreakdown.addOnItems || []).map((item, i) => (
+                                <div key={i} className="flex justify-between text-sm">
+                                    <span className="text-zg-secondary">{item.label}: <span className="text-zg-primary/70">{item.value}</span></span>
+                                    <span className="font-medium text-zg-primary">₹{item.price.toLocaleString('en-IN')}</span>
                                 </div>
-                            )}
-                            {priceBreakdown.otherSpecsCost > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-zg-secondary">Add-ons / Options</span>
-                                    <span className="font-medium text-zg-primary">₹{priceBreakdown.otherSpecsCost.toLocaleString('en-IN')}</span>
-                                </div>
-                            )}
+                            ))}
                             <div className="flex justify-between text-sm pt-2 border-t border-zg-secondary/10">
                                 <span className="text-zg-secondary">GST (18%)</span>
                                 <span className="font-medium text-zg-primary">₹{(priceBreakdown.tax || 0).toLocaleString('en-IN')}</span>

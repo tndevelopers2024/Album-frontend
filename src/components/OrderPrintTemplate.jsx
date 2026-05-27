@@ -177,91 +177,89 @@ const OrderPrintTemplate = ({ order }) => {
                 </table>
 
                 {/* Main Spec Table */}
-                <table className="main-spec-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '3%' }}>S.NO</th>
-                            <th style={{ width: '10%' }}>SIZE</th>
-                            <th style={{ width: '8%' }}>SHEET TYPE</th>
-                            <th style={{ width: '10%' }}>PRINT MACHINE TYPE</th>
-                            <th style={{ width: '10%' }}>LAMINATE TYPE</th>
-                            <th style={{ width: '10%' }}>PAD TYPE</th>
-                            <th style={{ width: '8%' }}>PAD COLOUR</th>
-                            <th style={{ width: '8%' }}>BOX TYPE</th>
-                            <th style={{ width: '8%' }}>BOX COLOUR</th>
-                            <th style={{ width: '8%' }}>BAG</th>
-                            <th style={{ width: '5%' }}>QTY</th>
-                            <th style={{ width: '12%' }}>TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td className="value">
-                                {order.size}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                {order.bindingType}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                HP - INDIGO
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                {order.paperType}
-                                <div className="sub-info">(Qty: {order.sheetCount})</div>
-                                <div className="sub-info">Amt: {((order.calculatedPrice - (order.product?.boxPrice || 500)) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                            </td>
-                            <td className="value">
-                                {order.coverType || 'LEATHER PAD'}
-                                <div className="sub-info">(Qty: 1)</div>
-                                <div className="sub-info">Amt: {(order.product?.boxPrice || 500).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                            </td>
-                            <td className="value">
-                                {order.albumColor || 'BLUE'}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                {order.boxType || 'LEATHER BOX'}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                {order.albumColor || 'BLUE'}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">
-                                {order.bagType || 'JUTE BAG'}
-                                <div className="sub-info">(Qty: 1)</div>
-                            </td>
-                            <td className="value">{order.quantity}</td>
-                            <td className="value" style={{ textAlign: 'right' }}>{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                {/* Dynamic Specifications */}
-                {order.dynamicSpecs && Object.keys(order.dynamicSpecs).length > 0 && (
-                    <div style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
-                        <table className="main-spec-table" style={{ border: 'none' }}>
+                {(() => {
+                    const specsArray = order.product?.specifications || [];
+                    const dynSpecs = order.dynamicSpecs || {};
+                    const labelValueMap = {};
+                    specsArray.forEach(s => {
+                        const rawLabel = (s.spec?.label || '').toLowerCase();
+                        const id = String(s.spec?._id || s.spec || '');
+                        if (id && dynSpecs[id]) labelValueMap[rawLabel] = dynSpecs[id];
+                    });
+                    const getVal = (...keys) => {
+                        for (const [label, val] of Object.entries(labelValueMap)) {
+                            if (keys.some(k => label.includes(k))) return val;
+                        }
+                        return 'N/A';
+                    };
+                    const sizeVal = getVal('size');
+                    const sheetTypeVal = getVal('paper');
+                    const laminateVal = getVal('binding', 'laminate');
+                    return (
+                        <table className="main-spec-table">
                             <thead>
                                 <tr>
-                                    {Object.keys(order.dynamicSpecs).map(key => (
-                                        <th key={key} style={{ textTransform: 'uppercase' }}>{key.replace(/_/g, ' ')}</th>
-                                    ))}
+                                    <th style={{ width: '5%' }}>S.NO</th>
+                                    <th style={{ width: '30%' }}>SIZE</th>
+                                    <th style={{ width: '25%' }}>SHEET TYPE</th>
+                                    <th style={{ width: '30%' }}>LAMINATE TYPE</th>
+                                    <th style={{ width: '10%' }}>QTY</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    {Object.values(order.dynamicSpecs).map((value, i) => (
-                                        <td key={i} className="value">{value}</td>
-                                    ))}
+                                    <td>1</td>
+                                    <td className="value">{sizeVal}</td>
+                                    <td className="value">
+                                        {sheetTypeVal}
+                                        <div className="sub-info">(Qty: 1)</div>
+                                    </td>
+                                    <td className="value">
+                                        {laminateVal}
+                                        {order.sheetCount ? <div className="sub-info">(Qty: {order.sheetCount})</div> : null}
+                                    </td>
+                                    <td className="value">{order.quantity}</td>
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
-                )}
+                    );
+                })()}
+
+                {/* Dynamic Specifications — map spec IDs to labels */}
+                {order.dynamicSpecs && Object.keys(order.dynamicSpecs).length > 0 && (() => {
+                    const specLabelMap = {};
+                    (order.product?.specifications || []).forEach(s => {
+                        const id = s.spec?._id || s.spec;
+                        if (id) {
+                            const raw = s.spec?.label || id;
+                            specLabelMap[id] = raw.toLowerCase().includes('binding') ? 'Laminate Type' : raw;
+                        }
+                    });
+                    const entries = Object.entries(order.dynamicSpecs).filter(([, v]) => v);
+                    if (!entries.length) return null;
+                    return (
+                        <div style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
+                            <table className="main-spec-table" style={{ border: 'none' }}>
+                                <thead>
+                                    <tr>
+                                        {entries.map(([key]) => (
+                                            <th key={key} style={{ textTransform: 'uppercase' }}>
+                                                {specLabelMap[key] || key}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        {entries.map(([key, value]) => (
+                                            <td key={key} className="value">{value}</td>
+                                        ))}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                })()}
 
                 {/* Job Done Details */}
                 <div className="job-done-header">Job Done Details</div>
@@ -283,28 +281,6 @@ const OrderPrintTemplate = ({ order }) => {
                                 <td></td>
                             </tr>
                         ))}
-                    </tbody>
-                </table>
-
-                {/* Billing Summary */}
-                <table>
-                    <tbody>
-                        <tr>
-                            <td className="billing-label">Delivery Charges :</td>
-                            <td className="billing-value">0.00</td>
-                        </tr>
-                        <tr>
-                            <td className="billing-label">Order Amount :</td>
-                            <td className="billing-value">{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                        <tr>
-                            <td className="billing-label">Advance :</td>
-                            <td className="billing-value">0.00</td>
-                        </tr>
-                        <tr>
-                            <td className="billing-label">Balance :</td>
-                            <td className="billing-value">{order.calculatedPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        </tr>
                     </tbody>
                 </table>
 

@@ -733,7 +733,7 @@ const ProductForm = () => {
                                                 className="p-4 cursor-pointer flex justify-between items-center"
                                                 onClick={() => toggleSpec(spec._id, spec.options)}
                                             >
-                                                <span className="font-bold text-sm">{spec.label}</span>
+                                                <span className="font-bold text-sm">{spec.label?.toLowerCase().includes('binding') ? 'Laminate Type' : spec.label}</span>
                                                 <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
                                                     isSelected ? 'bg-zg-accent border-zg-accent text-black' : 'border-zg-secondary/20'
                                                 }`}>

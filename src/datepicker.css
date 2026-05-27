@@ -101,3 +101,31 @@
 .react-datepicker__triangle {
     display: none;
 }
+
+.react-datepicker__month-select,
+.react-datepicker__year-select {
+    background-color: #1a1a1a;
+    color: #d4af37;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+}
+
+.react-datepicker__month-select:focus,
+.react-datepicker__year-select:focus {
+    border-color: #d4af37;
+}
+
+.react-datepicker__month-select option,
+.react-datepicker__year-select option {
+    background-color: #1a1a1a;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.react-datepicker__day--outside-month {
+    opacity: 0.3;
+}
